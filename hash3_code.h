@@ -1,6 +1,9 @@
 #ifndef HASH3_CODE_H_INCLUDED
 #define HASH3_CODE_H_INCLUDED
 
+//defined by us
+#define MAX_EMPTY_SLOT_NOT_FOUND 1000
+
 
 
 /////////////////////////////////////////////////////////////////////////////

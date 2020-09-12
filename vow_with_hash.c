@@ -3,14 +3,17 @@
 #define __device__
 
 #include <prho_vow.h>
-#include "C:\MinGW\include\time.h"
 #include <hash3_code.h>
+#include <string.h>
 
 
 // Defines that the user can control
 #define MAX_RUNS                    30
-#define NUM_WORKERS                200
-#define MODULO_NUM_BITS             24
+#define NUM_WORKERS                 200
+#define MODULO_NUM_BITS             16
+
+// defined by us 
+#define NUM_THREADS                 198
 
 
 // GLOBAL VARIABLES
@@ -42,56 +45,9 @@ IT_POINT_SET itPsets[NUM_THREADS];
 //
 ////////////////////////////////////////////////////////////////////////////
 
-
-void GetXY(int *x, int *y)
-{
-  CONSOLE_SCREEN_BUFFER_INFO  csbInfo;
-  GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbInfo);
-  *x = csbInfo.dwCursorPosition.X;
-  *y = csbInfo.dwCursorPosition.Y;
-}
-
-int wherex() {
-    int x, y;
-    GetXY(&x, &y);
-    return x;
-}
-
-int wherey() {
-    int x, y;
-    GetXY(&x, &y);
-    return y;
-}
-
-
 double get_wall_time(){
-    LARGE_INTEGER time,freq;
-    if (!QueryPerformanceFrequency(&freq)){
-        //  Handle error
-        return 0;
-    }
-    if (!QueryPerformanceCounter(&time)){
-        //  Handle error
-        return 0;
-    }
-    return (double)time.QuadPart / freq.QuadPart;
+    return 10.0;
 }
-
-double get_cpu_time(){
-    FILETIME a,b,c,d;
-    if (GetProcessTimes(GetCurrentProcess(),&a,&b,&c,&d) != 0){
-        //  Returns total user time.
-        //  Can be tweaked to include kernel times as well.
-        return
-            (double)(d.dwLowDateTime |
-            ((unsigned long long)d.dwHighDateTime << 32)) * 0.0000001;
-    }else{
-        //  Handle error
-        return 0;
-
-    }
-}
-
 
 void printP(POINT_T X)  {
     printf("(%7lld, %7lld), r = %8lld, s = %8lld", X.x, X.y, X.r, X.s);
@@ -708,7 +664,7 @@ calc_iteration_point_set3(IT_POINT_SET *itpset, IT_POINT_SET *itpsetbase,
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 void initial_point(POINT_T *init_point, POINT_T *Psums, POINT_T *Qsums, int nbits,
-                   int gtid, int alg, long long nworkers, long long a,
+                   int gtid, int alg, int nworkers, long long a,
                    long long p, long long order)
 {
     long long i, r, s;
@@ -850,8 +806,6 @@ int main()
 	uint32_t bitmask;
 	int i, id;
 
-	system("cls");
-
 	switch (algorithm)  {
         case VOW:   printf("\n\nPOLLARD RHO ALGORITHM  --  VOW\n");                  break;
         case TOHA:  printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises and Hares\n");  break;
@@ -945,9 +899,9 @@ int main()
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
         for (id=0; id < nworkers; id++) {
-            setup_worker(X, P, Q, a, p, maxorder, L, nbits, id, algorithm);
+            setup_worker(&X, P, Q, a, p, maxorder, L, nbits, id, algorithm);
             printf("\b\b\b%3d", id+1);
-            fflush(stdout);
+            //fflush(stdout);
         }
         printf("\nRun[%3d] iterations: ", run);
 
@@ -960,17 +914,24 @@ int main()
 
         for ( ; ; ) {
 
+            /*
+             * Usar a função worker_it_task it_number vezes, caso
+             * encontre sai da interação se não continua todas as interações
+             *  bug: faz mais de it_number interações
+             */
+
             for (id=0; id < nworkers; id++) {
                 worker_it_task(a, p, maxorder, L, id, &key);
+
+                // key -> !NOT_KEY  key == Key_found 
                 if (key != NO_KEY_FOUND) break;  // is the search over?
             }
 
             if (it_number%10  ==  0) printf(" %d ", it_number);
             else {
-                if (wherex() >= 80) printf("\n                     ");
                 printf("+");
             }
-            fflush(stdout);
+            //fflush(stdout);
 
             if (key != NO_KEY_FOUND) {
                 printf("  (%d its)\n", it_number);
@@ -1020,7 +981,7 @@ int main()
     printf("\n\nFINAL STATISTICS\n\n");
     printf("Runs = %d, Min Its # = %d,  Max Its = %d, Av. Iteration # = %.0lf, ", run, minits, maxits, total_it_num/MAX_RUNS);
     printf("Av. Iteration Time = %.1lf s, Total Time = %.1lf s\n\n", total_it_time/run, total_it_time);
-    fflush(stdout);
+    //fflush(stdout);
 
 	exit(0);
 }
