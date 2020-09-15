@@ -34,7 +34,7 @@ POINT_T   *Psums, *Qsums, *Tsums;
 POINT_T   X[NUM_THREADS];
 POINT_T   initX[NUM_THREADS];
 
-IT_POINT_SET itPsetBase;
+IT_POINT_SET itPsetBase[NUM_THREADS];
 
 IT_POINT_SET itPsets[NUM_THREADS];
 
@@ -222,7 +222,7 @@ long long multiplicative_inverse(long long num, long long modulo)
 
     		if (DEBUG) {
     		    printf("\n\n_______________________________________________________________________________\n\n\n");
-    		    printf("WILL BREAK:   rest = (r2 % r1) = 0      r2=%lld    r1=%lld\n\n", r2, r1);
+						printf("WILL BREAK:   rest = (r2 %% r1) = 0      r2=%lld    r1=%lld\n\n", r2, r1);
     		    printf("_______________________________________________________________________________\n\n");
     	    }
 
@@ -723,28 +723,6 @@ setup_worker(POINT_T *X, POINT_T P, POINT_T Q, long long a, long long p, long lo
     return;
 }
 
-
-////////////////////////////////////////////////////////////////////////////
-//
-// This function executes one iteration for one worker
-//
-////////////////////////////////////////////////////////////////////////////
-
-void
-worker_it_task(long long a, long long p, long long order,
-               const int L, int id, int *key)
-{
-    // Calculate the next point
-    X[id] = nextpoint(X[id], a, p, order, L, &itPsets[id]);
-
-    // Handle the new point checking if the key has been found
-    handle_newpoint(X[id], order, key);
-}
-
-
-
-
-
 /////////////////////////////////////////////////////////////////////////////
 //
 // This function stores a new point in the hashtable and looks for
@@ -790,6 +768,28 @@ void handle_newpoint(POINT_T X, long long order, long long *key)
 
     return;
 }
+
+////////////////////////////////////////////////////////////////////////////
+//
+// This function executes one iteration for one worker
+//
+////////////////////////////////////////////////////////////////////////////
+
+void
+worker_it_task(long long a, long long p, long long order,
+               const int L, int id, long long *key)
+{
+    // Calculate the next point
+    X[id] = nextpoint(X[id], a, p, order, L, &itPsets[id]);
+
+    // Handle the new point checking if the key has been found
+    handle_newpoint(X[id], order, key);
+}
+
+
+
+
+
 
 
 int main()
@@ -861,7 +861,7 @@ int main()
 
 	printf("Order of the curve = %lld\n\n", maxorder);
 
-	printf("Number of workers = %lld\n\n", nworkers);
+	printf("Number of workers = %d\n\n", nworkers);
 
     // Calculating point Q = kP
     printf("Calculating point Q = kP      (k = %lld)\n", k);
@@ -891,10 +891,10 @@ int main()
         srand(time(NULL));
 
         // Start counting the setup time
-        start = get_wall_time();
+        start = 0;// get_wall_time();
 
         // Calculate the iteration point set base (randomly)
-        rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
+        //rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
 
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
