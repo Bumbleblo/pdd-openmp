@@ -5,12 +5,14 @@
 #include <prho_vow.h>
 #include <hash3_code.h>
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
 
 
 // Defines that the user can control
 #define MAX_RUNS                    30
 #define NUM_WORKERS                 200
-#define MODULO_NUM_BITS             16
+#define MODULO_NUM_BITS             20
 
 // defined by us 
 #define NUM_THREADS                 198
@@ -44,9 +46,16 @@ IT_POINT_SET itPsets[NUM_THREADS];
 // Utility Functions
 //
 ////////////////////////////////////////////////////////////////////////////
+//
+
+
 
 double get_wall_time(){
-    return 10.0;
+    struct timeval time;
+    if (gettimeofday(&time,NULL)){
+        return 0;
+    }
+    return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }
 
 void printP(POINT_T X)  {
@@ -891,10 +900,10 @@ int main()
         srand(time(NULL));
 
         // Start counting the setup time
-        start = 0;// get_wall_time();
+        start = get_wall_time();
 
         // Calculate the iteration point set base (randomly)
-        //rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
+        rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
 
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
@@ -907,7 +916,8 @@ int main()
 
         // Stop counting the setup time and calculate it
         end = get_wall_time();
-        setup_time = 1000*(double)((end - start) / CLOCKS_PER_SEC);
+
+        setup_time = ((double)(end - start));
 
         // Start counting the execution time
         start = get_wall_time();
@@ -942,7 +952,7 @@ int main()
 
         // Recover the current time and calculate the execution time
         end = get_wall_time();
-        convergence_time = 1000*(double)((end - start) / CLOCKS_PER_SEC);
+        convergence_time = ((double)(end - start));
 
         // Choose text for describing the algorithm iteration point sets
         char *stepdef;
