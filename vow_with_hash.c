@@ -5,12 +5,15 @@
 #include <prho_vow.h>
 #include <hash3_code.h>
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
+#include <omp.h>
 
 
 // Defines that the user can control
 #define MAX_RUNS                    30
 #define NUM_WORKERS                 200
-#define MODULO_NUM_BITS             16
+#define MODULO_NUM_BITS             20
 
 // defined by us 
 #define NUM_THREADS                 198
@@ -44,9 +47,16 @@ IT_POINT_SET itPsets[NUM_THREADS];
 // Utility Functions
 //
 ////////////////////////////////////////////////////////////////////////////
+//
+
+
 
 double get_wall_time(){
-    return 10.0;
+    struct timeval time;
+    if (gettimeofday(&time,NULL)){
+        return 0;
+    }
+    return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }
 
 void printP(POINT_T X)  {
@@ -468,67 +478,71 @@ long long equal(POINT_T X1, POINT_T X2)  {
 
 void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
 {
-    uint32_t index1 = (uint32_t) X.y, index2 = (uint32_t) ((X.y + 2) >> 1);
-    POINT_T H;
 
-    // Modify index2 according to the token value
-    if (token > 0) index2 = (index2 + token*index1) % TABLESIZE;
+    #pragma critical(hash)
+    {
+        uint32_t index1 = (uint32_t) X.y, index2 = (uint32_t) ((X.y + 2) >> 1);
+        POINT_T H;
 
-    hashword2((const uint32_t *) &X.x, 1, &index1, &index2);
-    index1 = index1 % TABLESIZE;
-    index2 = index2 % TABLESIZE;
+        // Modify index2 according to the token value
+        if (token > 0) index2 = (index2 + token*index1) % TABLESIZE;
 
-    // Check slot1; if slot1 is empty, store the point and return
-    if (equal(hashtable[index1], EMPTY_POINT)) {
-        hashtable[index1] = X;
-        *retval = STORED;
-        return;
-    }
-    else {
-        // Get the point from slot1
-        H = hashtable[index1];
+        hashword2((const uint32_t *) &X.x, 1, &index1, &index2);
+        index1 = index1 % TABLESIZE;
+        index2 = index2 % TABLESIZE;
 
-        // Check the point from slot1
-        if ((H.x == X.x) && (H.y == X.y))  {
-            // If point is the same with different coefficients, return point
-            if ((H.r != X.r) || (H.s != X.s)) {
-                *Y = H;
-                *retval = GOOD_COLLISION;
-                return;
-            }
-        }
-        // Point in slot1 was either different or the same with the same coefficients.
-        // Check slot2; if slot2 is empty, store the point and return
-        if (equal(hashtable[index2], EMPTY_POINT)) {
-            hashtable[index2] = X;
+        // Check slot1; if slot1 is empty, store the point and return
+        if (equal(hashtable[index1], EMPTY_POINT)) {
+            hashtable[index1] = X;
             *retval = STORED;
             return;
         }
         else {
-            // Get the point from slot2
-            H = hashtable[index2];
+            // Get the point from slot1
+            H = hashtable[index1];
 
-            // Test the point from slot2
+            // Check the point from slot1
             if ((H.x == X.x) && (H.y == X.y))  {
-                // If point in slot 2 is the same with different coefficients, return point
+                // If point is the same with different coefficients, return point
                 if ((H.r != X.r) || (H.s != X.s)) {
                     *Y = H;
                     *retval = GOOD_COLLISION;
                     return;
                 }
-                else
-                    // If point is the same with same coefficients report unfruitful
-                    *retval = UNFRUITFUL_COLLISION;
-                    return;
             }
-            else {
-                // If point is different report empty slot not found
-                *Y = H;
-                *retval = EMPTY_SLOT_NOT_FOUND;
+            // Point in slot1 was either different or the same with the same coefficients.
+            // Check slot2; if slot2 is empty, store the point and return
+            if (equal(hashtable[index2], EMPTY_POINT)) {
+                hashtable[index2] = X;
+                *retval = STORED;
                 return;
             }
+            else {
+                // Get the point from slot2
+                H = hashtable[index2];
+
+                // Test the point from slot2
+                if ((H.x == X.x) && (H.y == X.y))  {
+                    // If point in slot 2 is the same with different coefficients, return point
+                    if ((H.r != X.r) || (H.s != X.s)) {
+                        *Y = H;
+                        *retval = GOOD_COLLISION;
+                        return;
+                    }
+                    else
+                        // If point is the same with same coefficients report unfruitful
+                        *retval = UNFRUITFUL_COLLISION;
+                        return;
+                }
+                else {
+                    // If point is different report empty slot not found
+                    *Y = H;
+                    *retval = EMPTY_SLOT_NOT_FOUND;
+                    return;
+                }
+            }
         }
-    }
+   }
 }
 
 
@@ -891,10 +905,10 @@ int main()
         srand(time(NULL));
 
         // Start counting the setup time
-        start = 0;// get_wall_time();
+        start = get_wall_time();
 
         // Calculate the iteration point set base (randomly)
-        //rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
+        rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
 
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
@@ -907,7 +921,8 @@ int main()
 
         // Stop counting the setup time and calculate it
         end = get_wall_time();
-        setup_time = 1000*(double)((end - start) / CLOCKS_PER_SEC);
+
+        setup_time = ((double)(end - start));
 
         // Start counting the execution time
         start = get_wall_time();
@@ -942,7 +957,7 @@ int main()
 
         // Recover the current time and calculate the execution time
         end = get_wall_time();
-        convergence_time = 1000*(double)((end - start) / CLOCKS_PER_SEC);
+        convergence_time = ((double)(end - start));
 
         // Choose text for describing the algorithm iteration point sets
         char *stepdef;

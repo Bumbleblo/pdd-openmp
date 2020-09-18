@@ -2,7 +2,7 @@
 #define HASH3_CODE_H_INCLUDED
 
 //defined by us
-#define MAX_EMPTY_SLOT_NOT_FOUND 1000
+#define MAX_EMPTY_SLOT_NOT_FOUND 10000
 
 
 
