@@ -997,6 +997,7 @@ int main()
         total_it_time = total_it_time + convergence_time;
 
         // Cleanup the hash table
+        #pragma omp parallel for private(i)
         for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
 
         if (run == MAX_RUNS) break;
