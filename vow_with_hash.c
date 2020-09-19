@@ -11,12 +11,12 @@
 
 
 // Defines that the user can control
-#define MAX_RUNS                    30
-#define NUM_WORKERS                 200
-#define MODULO_NUM_BITS             20
+#define MAX_RUNS                    10
+#define NUM_WORKERS                 8 
+#define MODULO_NUM_BITS             24
 
 // defined by us 
-#define NUM_THREADS                 198
+#define NUM_THREADS                8 
 
 
 // GLOBAL VARIABLES
@@ -37,7 +37,7 @@ POINT_T   *Psums, *Qsums, *Tsums;
 POINT_T   X[NUM_THREADS];
 POINT_T   initX[NUM_THREADS];
 
-IT_POINT_SET itPsetBase[NUM_THREADS];
+IT_POINT_SET itPsetBase;
 
 IT_POINT_SET itPsets[NUM_THREADS];
 
@@ -479,7 +479,6 @@ long long equal(POINT_T X1, POINT_T X2)  {
 void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
 {
 
-    #pragma critical(hash)
     {
         uint32_t index1 = (uint32_t) X.y, index2 = (uint32_t) ((X.y + 2) >> 1);
         POINT_T H;
@@ -493,6 +492,7 @@ void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
 
         // Check slot1; if slot1 is empty, store the point and return
         if (equal(hashtable[index1], EMPTY_POINT)) {
+						#pragma omp critical(hashtable)
             hashtable[index1] = X;
             *retval = STORED;
             return;
@@ -513,6 +513,7 @@ void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
             // Point in slot1 was either different or the same with the same coefficients.
             // Check slot2; if slot2 is empty, store the point and return
             if (equal(hashtable[index2], EMPTY_POINT)) {
+						#pragma omp critical(hashtable)
                 hashtable[index2] = X;
                 *retval = STORED;
                 return;
@@ -721,7 +722,7 @@ void initial_point(POINT_T *init_point, POINT_T *Psums, POINT_T *Qsums, int nbit
 ////////////////////////////////////////////////////////////////////////////
 
 void
-setup_worker(POINT_T *X, POINT_T P, POINT_T Q, long long a, long long p, long long order,
+setup_worker(POINT_T *X, long long a, long long p, long long order,
              const int L, const int nbits, int id, int alg)
 {
     // Clear the iteration point set memory
@@ -795,6 +796,8 @@ worker_it_task(long long a, long long p, long long order,
 {
     // Calculate the next point
     X[id] = nextpoint(X[id], a, p, order, L, &itPsets[id]);
+		//printf("x: %d %d %d %d\n", X[id].x, X[id].y, X[id].r, X[id].s);
+
 
     // Handle the new point checking if the key has been found
     handle_newpoint(X[id], order, key);
@@ -810,14 +813,15 @@ int main()
 {
 	long long a, b, p, maxorder, k;
 	long long key;
-	int it_number, minits, maxits = 0, run=1;
-	POINT_T G, Q, P;
-	time_t  init, term;
+	int it_number, minits, maxits = 0, run = 1;
+	//POINT_T G; 
+	POINT_T Q, P;
+	//time_t  init, term;
 	double start, end;
 	double convergence_time, setup_time;
-	double average_it_num = 0.0, average_it_time = 0.0;
+	//double average_it_num = 0.0, average_it_time = 0.0;
 	double total_it_num = 0.0, total_it_time = 0.0;
-	uint32_t bitmask;
+	//uint32_t bitmask;
 	int i, id;
 
 	switch (algorithm)  {
@@ -897,7 +901,7 @@ int main()
     // calculation takes.
 
     while (1) {
-
+		
         // Initialize the number of iterations
         it_number = 1;
 
@@ -912,8 +916,10 @@ int main()
 
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
+
+				#pragma omp parallel for private(id)
         for (id=0; id < nworkers; id++) {
-            setup_worker(&X, P, Q, a, p, maxorder, L, nbits, id, algorithm);
+            setup_worker(&X, a, p, maxorder, L, nbits, id, algorithm);
             printf("\b\b\b%3d", id+1);
             //fflush(stdout);
         }
@@ -926,7 +932,7 @@ int main()
 
         // Start counting the execution time
         start = get_wall_time();
-
+				
         for ( ; ; ) {
 
             /*
@@ -934,12 +940,15 @@ int main()
              * encontre sai da interação se não continua todas as interações
              *  bug: faz mais de it_number interações
              */
-
+						long long rkey = -1;
+						#pragma omp parallel for private(id, key) reduction(max : rkey)
             for (id=0; id < nworkers; id++) {
                 worker_it_task(a, p, maxorder, L, id, &key);
-
+							
                 // key -> !NOT_KEY  key == Key_found 
-                if (key != NO_KEY_FOUND) break;  // is the search over?
+                if (key != NO_KEY_FOUND){
+									rkey = key;
+								}
             }
 
             if (it_number%10  ==  0) printf(" %d ", it_number);
@@ -948,7 +957,9 @@ int main()
             }
             //fflush(stdout);
 
-            if (key != NO_KEY_FOUND) {
+            //if (abs(reductedKey) != abs(NO_KEY_FOUND)) {
+            if (rkey != NO_KEY_FOUND) {
+								key = rkey;
                 printf("  (%d its)\n", it_number);
                 break;
             }
