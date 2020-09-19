@@ -12,12 +12,9 @@
 
 // Defines that the user can control
 #define MAX_RUNS                    30
+#define MODULO_NUM_BITS             24
 #define NUM_WORKERS                 200
-#define MODULO_NUM_BITS             20
-
-// defined by us 
-#define NUM_THREADS                 198
-
+#define NUM_THREADS                 200 // defined by us
 
 // GLOBAL VARIABLES
 
@@ -37,7 +34,7 @@ POINT_T   *Psums, *Qsums, *Tsums;
 POINT_T   X[NUM_THREADS];
 POINT_T   initX[NUM_THREADS];
 
-IT_POINT_SET itPsetBase[NUM_THREADS];
+IT_POINT_SET itPsetBase;
 
 IT_POINT_SET itPsets[NUM_THREADS];
 
@@ -371,7 +368,12 @@ long long int get_k(long long c1, long long d1, long long c2, long long d2, long
 }
 
 long long get_rand(long long order) {
-    long long num = rand() % order;
+    long long num;
+    
+    #pragma omp critical
+    {
+        num  = rand() % order;
+    }
     return(num);
 }
 
@@ -912,10 +914,12 @@ int main()
 
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
-        for (id=0; id < nworkers; id++) {
-            setup_worker(&X, P, Q, a, p, maxorder, L, nbits, id, algorithm);
-            printf("\b\b\b%3d", id+1);
-            //fflush(stdout);
+        //for (id=0; id < nworkers; id++) {
+        //
+        #pragma omp parallel 
+        {
+            
+            setup_worker(&X, P, Q, a, p, maxorder, L, nbits, omp_get_thread_num(), algorithm);
         }
         printf("\nRun[%3d] iterations: ", run);
 
@@ -935,17 +939,19 @@ int main()
              *  bug: faz mais de it_number interações
              */
 
-            for (id=0; id < nworkers; id++) {
-                worker_it_task(a, p, maxorder, L, id, &key);
+             //
+
+            //for (id=0; id < nworkers; id++) {
+
+            #pragma omp parallel 
+            {
+                //printf("ID %d\n", omp_get_thread_num());
+                worker_it_task(a, p, maxorder, L, omp_get_thread_num(), &key);
 
                 // key -> !NOT_KEY  key == Key_found 
                 if (key != NO_KEY_FOUND) break;  // is the search over?
             }
 
-            if (it_number%10  ==  0) printf(" %d ", it_number);
-            else {
-                printf("+");
-            }
             //fflush(stdout);
 
             if (key != NO_KEY_FOUND) {
