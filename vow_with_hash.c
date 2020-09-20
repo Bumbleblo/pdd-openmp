@@ -50,9 +50,11 @@ IT_POINT_SET itPsets[NUM_THREADS];
 
 double get_wall_time(){
     struct timeval time;
+
     if (gettimeofday(&time,NULL)){
         return 0;
     }
+
     return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }
 
@@ -914,13 +916,18 @@ int main()
 
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
-        //for (id=0; id < nworkers; id++) {
         //
         #pragma omp parallel 
         {
-            
-            setup_worker(&X, P, Q, a, p, maxorder, L, nbits, omp_get_thread_num(), algorithm);
+
+            #pragma omp for private(id)
+            for (id=0; id < nworkers; id++) {
+                
+                setup_worker(&X, P, Q, a, p, maxorder, L, nbits, id, algorithm);
+            }
+
         }
+
         printf("\nRun[%3d] iterations: ", run);
 
         // Stop counting the setup time and calculate it
@@ -932,32 +939,22 @@ int main()
         start = get_wall_time();
 
         for ( ; ; ) {
-
-            /*
-             * Usar a função worker_it_task it_number vezes, caso
-             * encontre sai da interação se não continua todas as interações
-             *  bug: faz mais de it_number interações
-             */
-
-             //
-
-            //for (id=0; id < nworkers; id++) {
-
-            #pragma omp parallel 
+            
+            #pragma omp parallel
             {
-                //printf("ID %d\n", omp_get_thread_num());
-                worker_it_task(a, p, maxorder, L, omp_get_thread_num(), &key);
 
-                // key -> !NOT_KEY  key == Key_found 
-                if (key != NO_KEY_FOUND) break;  // is the search over?
+                #pragma omp for private(id) reduction(max: key)
+                for (id=0; id < nworkers; id++) {
+                    worker_it_task(a, p, maxorder, L, id, &key);
+                }
+
             }
-
-            //fflush(stdout);
 
             if (key != NO_KEY_FOUND) {
                 printf("  (%d its)\n", it_number);
                 break;
             }
+
             it_number++;
         }
 
