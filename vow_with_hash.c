@@ -13,8 +13,8 @@
 // Defines that the user can control
 #define MAX_RUNS                    30
 #define MODULO_NUM_BITS             24
-#define NUM_WORKERS                 200
-#define NUM_THREADS                 200 // defined by us
+#define NUM_WORKERS                 1
+#define NUM_THREADS                 1 // defined by us
 
 // GLOBAL VARIABLES
 
@@ -158,22 +158,6 @@ POINT_T add_PQ(POINT_T p, POINT_T q, long long mod)
 }
 
 
-POINT_T subpoints(POINT_T p, POINT_T q, long long a, long long mod)
-{
-	POINT_T val;
-
-	q.y = -q.y;
-	while (q.y < 0) {
-		q.y += mod;
-	}
-
-	if (p.x==q.x && p.y==q.y)  val = add_2P(p, a, mod);
-	else val = add_PQ(p, q, mod);
-
-	return(val);
-}
-
-
 POINT_T addpoints(POINT_T P, POINT_T Q, long long a , long long p, long long order)
 {
 	POINT_T val;
@@ -188,25 +172,6 @@ POINT_T addpoints(POINT_T P, POINT_T Q, long long a , long long p, long long ord
 
 	return(val);
 }
-
-
-POINT_T multpoint(long long n, POINT_T P, long long a, long long mod, long long order)
-{
-	long long i=1;
-	POINT_T val = P;
-
-	if (n == 1) return(P);
-	if (n < 0)  { val.x = -1;  val.y = -1;  return(val); }
-	if (n == 0) { val.x = 0;   val.y = 0;   return(val); }
-
-	do {
-		val = addpoints(val, P, a, mod, order);
-		i++;
-	} while (i < n);
-
-	return(val);
-}
-
 
 long long multiplicative_inverse(long long num, long long modulo)
 {
@@ -340,13 +305,13 @@ long long get_group(POINT_T R, int L)  {
 
 
 POINT_T nextpoint(POINT_T P, long long a, long long p,
-                    long long order, int L, POINT_T *Triplet)
+                    long long order, int L, IT_POINT_SET *Triplet)
 {
     POINT_T Y;
     long long g;
 
     g = get_group(P, L);
-    Y = addpoints(P, Triplet[g], a, p, order);
+    Y = addpoints(P, Triplet->itpoint[g], a, p, order);
 
     return(Y);
 }
@@ -436,26 +401,30 @@ rand_itpset(IT_POINT_SET *itpset, POINT_T *Psums, POINT_T *Qsums, int tid,
     long long i, j, r, s;
     uint32_t bitmask = 1;
 
-    for (i=0; i < L; i++)
+    #pragma omp parallel
     {
-        r = get_rand(order);
-        s = get_rand(order);
+        #pragma omp for private(i)
+        for (i=0; i < L; i++)
+        {
+            r = get_rand(order);
+            s = get_rand(order);
 
-        itpset->itpoint[i] = EMPTY_POINT;
-        bitmask = 1;
+            itpset->itpoint[i] = EMPTY_POINT;
+            bitmask = 1;
 
-        for (j=0; j < nbits; j++) {
-            if (r & bitmask) {
-                itpset->itpoint[i] = addpoints(itpset->itpoint[i], Psums[j], a, p, 0);
+            for (j=0; j < nbits; j++) {
+                if (r & bitmask) {
+                    itpset->itpoint[i] = addpoints(itpset->itpoint[i], Psums[j], a, p, 0);
+                }
+                if (s & bitmask) {
+                    itpset->itpoint[i] = addpoints(itpset->itpoint[i], Qsums[j], a, p, 0);
+                }
+                bitmask = (bitmask << 1);
             }
-            if (s & bitmask) {
-                itpset->itpoint[i] = addpoints(itpset->itpoint[i], Qsums[j], a, p, 0);
-            }
-            bitmask = (bitmask << 1);
+
+            itpset->itpoint[i].r = r;
+            itpset->itpoint[i].s = s;
         }
-
-        itpset->itpoint[i].r = r;
-        itpset->itpoint[i].s = s;
     }
 
     return;
@@ -590,47 +559,6 @@ mult_PQpset2(IT_POINT_SET *nitpset, IT_POINT_SET *ipset, long long mult, POINT_T
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////////
-//
-// This function calculates the iteration point set IPS (composed of L points) for
-// a worker by multiplying the iteration point set base (itSetBase) by an integer m:
-//
-//                             IPS = m * itSetBase
-//
-///////////////////////////////////////////////////////////////////////////////////////////
-
-void calc_iteration_point_set2(IT_POINT_SET *itpset, IT_POINT_SET *itpsetbase, POINT_T *Psums, POINT_T *Qsums, int tid,
-                              long long a, long long p, long long order, int L, int nbits, int algorithm)
-
-{
-    int m;
-
-    if (algorithm == VOW) {
-        // Each and every worker has its iteration point set equal to itPsetBase
-       *itpset = *itpsetbase;
-    }
-
-    else if (algorithm == TOHA) {
-        if ((tid % 2) == 0) {
-            *itpset = *itpsetbase;
-        }
-        else {
-            // Each odd worker's iteration point set is a multiple of itPsetBase (itPsetBase * (tid+3)/2)
-            m = (tid+3)/2;
-            mult_PQpset2(itpset, itpsetbase, m, Psums, Qsums, L, nbits, a, p, order);
-        }
-    }
-
-    else if (algorithm == HARES) {
-        // Each and every worker's iteration point set is a multiple of itPsetBase (itPsetBase * (tid+1)
-        m = tid+1;
-        mult_PQpset2(itpset, itpsetbase, m, Psums, Qsums, L, nbits, a, p, order);
-    }
-
-    return;
-}
-
-
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -728,6 +656,7 @@ void
 setup_worker(POINT_T *X, POINT_T P, POINT_T Q, long long a, long long p, long long order,
              const int L, const int nbits, int id, int alg)
 {
+
     // Clear the iteration point set memory
     memset(&itPsets[id], 0, sizeof(IT_POINT_SET));
 
@@ -769,6 +698,7 @@ void handle_newpoint(POINT_T X, long long order, long long *key)
                     printf("               H = "); printP(H); printf("\n\n");
                     exit(-3);
                 }
+                break;
             case UNFRUITFUL_COLLISION:
                 // printf("   --  Unfruitful collision -- continuing ...\n");
                 printf("@");
@@ -813,7 +743,7 @@ worker_it_task(long long a, long long p, long long order,
 int main()
 {
 	long long a, b, p, maxorder, k;
-	long long key;
+	long long key = NO_KEY_FOUND;
 	int it_number, minits, maxits = 0, run=1;
 	POINT_T G, Q, P;
 	time_t  init, term;
@@ -923,7 +853,7 @@ int main()
             #pragma omp for private(id)
             for (id=0; id < nworkers; id++) {
                 
-                setup_worker(&X, P, Q, a, p, maxorder, L, nbits, id, algorithm);
+                setup_worker(&X[id], P, Q, a, p, maxorder, L, nbits, id, algorithm);
             }
 
         }
@@ -950,12 +880,13 @@ int main()
 
             }
 
+            it_number++;
+
             if (key != NO_KEY_FOUND) {
                 printf("  (%d its)\n", it_number);
                 break;
             }
 
-            it_number++;
         }
 
         // Recover the current time and calculate the execution time
