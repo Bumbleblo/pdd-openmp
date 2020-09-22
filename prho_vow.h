@@ -14,7 +14,7 @@
 #include <wchar.h>
 #endif
 
-#define NUM_WORKERS                200
+#define NUM_WORKERS                  8
 #define NUM_IT_FUNCTION_INTERVALS   32
 #define NO_KEY_FOUND                -1
 
