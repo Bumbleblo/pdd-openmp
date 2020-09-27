@@ -822,6 +822,8 @@ worker_it_task(long long a, long long p, long long order,
 
 int main()
 {
+
+    omp_set_num_threads(NUM_WORKERS);
 	long long a, b, p, maxorder, k;
 	long long key;
 	int it_number, minits, maxits = 0, run = 1;

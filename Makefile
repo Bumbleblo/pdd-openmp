@@ -5,11 +5,14 @@ bits=16
 all: compile run clean
 
 compile: 
-	@export OMP_NUM_THREADS=$(workers)
-	gcc -o prog.out -I. -D NUM_WORKERS=$(workers) -D MODULO_NUM_BITS=$(bits) -fopenmp vow_with_hash.c
+	OMP_NUM_THREADS=$(workers)
+
+	echo $(OMP_NUM_THREADS)
+
+	@gcc -o prog.out -I. -D NUM_WORKERS=$(workers) -D MODULO_NUM_BITS=$(bits) -fopenmp vow_with_hash.c
 
 run:
-	./prog.out 
+	@./prog.out 
 
 clean:
-	rm prog.out
+	@rm prog.out
