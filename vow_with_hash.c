@@ -838,8 +838,10 @@ int main()
 	int i, id;
 
     double run_start, run_end;
+    run_start = get_wall_time();
 
-    run_start = get_cpu_time();
+    double run_real_start, run_real_end;
+    run_real_start = get_cpu_time();
 
 	switch (algorithm)  {
         case VOW:   printf("\n\nPOLLARD RHO ALGORITHM  --  VOW\n");                  break;
@@ -1027,9 +1029,20 @@ int main()
     printf("Av. Iteration Time = %.1lf s, Total Time = %.1lf s\n\n", total_it_time/run, total_it_time);
     //fflush(stdout);
 
-    run_end = get_cpu_time();
 
-    printf("Total time: %.2lf\n", ((double) (run_end - run_start)));
+
+    run_end = get_wall_time();
+    run_real_end = get_cpu_time();
+
+    double tp = ((double) run_end - run_start);
+    double t1 = ((double) run_real_end - run_real_start);
+
+    printf("T(1): %.2lf\n", t1);
+    printf("T(p): %.2lf\n", tp);
+    printf("p: %d\n", NUM_WORKERS);
+    printf("S(P): %.2lf\n", t1/tp);
+    printf("E(P): %.10lf\n", (t1/tp)/((double)p));
+
 	exit(0);
 }
 
