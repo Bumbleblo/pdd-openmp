@@ -11,7 +11,7 @@
 
 
 // Defines that the user can control
-#define MAX_RUNS                    10
+#define MAX_RUNS                    30
 #define NUM_WORKERS                 8 
 #define MODULO_NUM_BITS             24
 
@@ -492,7 +492,7 @@ void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
 
         // Check slot1; if slot1 is empty, store the point and return
         if (equal(hashtable[index1], EMPTY_POINT)) {
-						#pragma omp critical(hashtable)
+			#pragma omp critical(hashtable)
             hashtable[index1] = X;
             *retval = STORED;
             return;
@@ -513,7 +513,7 @@ void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
             // Point in slot1 was either different or the same with the same coefficients.
             // Check slot2; if slot2 is empty, store the point and return
             if (equal(hashtable[index2], EMPTY_POINT)) {
-						#pragma omp critical(hashtable)
+			    #pragma omp critical(hashtable)
                 hashtable[index2] = X;
                 *retval = STORED;
                 return;
@@ -917,7 +917,7 @@ int main()
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
 
-				#pragma omp parallel for private(id)
+		#pragma omp parallel for private(id)
         for (id=0; id < nworkers; id++) {
             setup_worker(&X, a, p, maxorder, L, nbits, id, algorithm);
             printf("\b\b\b%3d", id+1);
@@ -940,15 +940,15 @@ int main()
              * encontre sai da interação se não continua todas as interações
              *  bug: faz mais de it_number interações
              */
-						long long rkey = -1;
-						#pragma omp parallel for private(id, key) reduction(max : rkey)
+            long long rkey = -1;
+            #pragma omp parallel for private(id, key) reduction(max : rkey)
             for (id=0; id < nworkers; id++) {
                 worker_it_task(a, p, maxorder, L, id, &key);
 							
                 // key -> !NOT_KEY  key == Key_found 
                 if (key != NO_KEY_FOUND){
-									rkey = key;
-								}
+                    rkey = key;
+                }
             }
 
             if (it_number%10  ==  0) printf(" %d ", it_number);
@@ -959,7 +959,7 @@ int main()
 
             //if (abs(reductedKey) != abs(NO_KEY_FOUND)) {
             if (rkey != NO_KEY_FOUND) {
-								key = rkey;
+				key = rkey;
                 printf("  (%d its)\n", it_number);
                 break;
             }
