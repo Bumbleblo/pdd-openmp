@@ -11,12 +11,19 @@
 
 
 // Defines that the user can control
-#define MAX_RUNS                    30
-#define NUM_WORKERS                 8 
-#define MODULO_NUM_BITS             24
+#define MAX_RUNS                    50
+
+#ifndef NUM_WORKERS
+    #define NUM_WORKERS                1
+#endif
+
+#define NUM_THREADS                NUM_WORKERS
+
+#ifndef MODULO_NUM_BITS
+    #define MODULO_NUM_BITS            16
+#endif
 
 // defined by us 
-#define NUM_THREADS                8 
 
 
 // GLOBAL VARIABLES
@@ -57,6 +64,10 @@ double get_wall_time(){
         return 0;
     }
     return (double)time.tv_sec + (double)time.tv_usec * .000001;
+}
+
+double get_cpu_time(){
+    return (double)clock() / CLOCKS_PER_SEC;
 }
 
 void printP(POINT_T X)  {
@@ -824,6 +835,10 @@ int main()
 	//uint32_t bitmask;
 	int i, id;
 
+    double run_start, run_end;
+
+    run_start = get_cpu_time();
+
 	switch (algorithm)  {
         case VOW:   printf("\n\nPOLLARD RHO ALGORITHM  --  VOW\n");                  break;
         case TOHA:  printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises and Hares\n");  break;
@@ -1010,6 +1025,9 @@ int main()
     printf("Av. Iteration Time = %.1lf s, Total Time = %.1lf s\n\n", total_it_time/run, total_it_time);
     //fflush(stdout);
 
+    run_end = get_cpu_time();
+
+    printf("Total time: %.2lf\n", ((double) (run_end - run_start)));
 	exit(0);
 }
 
