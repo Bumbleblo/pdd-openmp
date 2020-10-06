@@ -490,6 +490,7 @@ long long equal(POINT_T X1, POINT_T X2)  {
 void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
 {
 
+	#pragma omp critical(hashtable)
     {
         uint32_t index1 = (uint32_t) X.y, index2 = (uint32_t) ((X.y + 2) >> 1);
         POINT_T H;
@@ -503,10 +504,8 @@ void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
 
         // Check slot1; if slot1 is empty, store the point and return
         if (equal(hashtable[index1], EMPTY_POINT)) {
-			#pragma omp critical(hashtable)
             hashtable[index1] = X;
             *retval = STORED;
-            return;
         }
         else {
             // Get the point from slot1
@@ -518,16 +517,13 @@ void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
                 if ((H.r != X.r) || (H.s != X.s)) {
                     *Y = H;
                     *retval = GOOD_COLLISION;
-                    return;
                 }
-            }
+            }else
             // Point in slot1 was either different or the same with the same coefficients.
             // Check slot2; if slot2 is empty, store the point and return
             if (equal(hashtable[index2], EMPTY_POINT)) {
-			    #pragma omp critical(hashtable)
                 hashtable[index2] = X;
                 *retval = STORED;
-                return;
             }
             else {
                 // Get the point from slot2
@@ -539,18 +535,15 @@ void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
                     if ((H.r != X.r) || (H.s != X.s)) {
                         *Y = H;
                         *retval = GOOD_COLLISION;
-                        return;
                     }
                     else
                         // If point is the same with same coefficients report unfruitful
                         *retval = UNFRUITFUL_COLLISION;
-                        return;
                 }
                 else {
                     // If point is different report empty slot not found
                     *Y = H;
                     *retval = EMPTY_SLOT_NOT_FOUND;
-                    return;
                 }
             }
         }
@@ -939,7 +932,6 @@ int main()
 		#pragma omp parallel for private(id)
         for (id=0; id < nworkers; id++) {
             setup_worker(&X, a, p, maxorder, L, nbits, id, algorithm);
-            printf("\b\b\b%3d", id+1);
             //fflush(stdout);
         }
         printf("\nRun[%3d] iterations: ", run);
@@ -968,11 +960,6 @@ int main()
                 if (key != NO_KEY_FOUND){
                     rkey = key;
                 }
-            }
-
-            if (it_number%10  ==  0) printf(" %d ", it_number);
-            else {
-                printf("+");
             }
             //fflush(stdout);
 
