@@ -91,7 +91,7 @@ long long get_rand(long long order);
 void setup(POINT_T *X, POINT_T P, POINT_T Q, long long a, long long p, long long order,
              const int L, const int nbits, const long long nworkers, int alg);
 POINT_T nextpoint(POINT_T X, long long a, long long p,
-                    long long order, int L, POINT_T *Triplet);
+                    long long order, int L, IT_POINT_SET *Triplet);
 long long int get_k(long long c1, long long d1, long long c2, long long d2,
                     long long order);
 void calc_tripletset(POINT_T *tripletset, POINT_T P, POINT_T Q, long long a,

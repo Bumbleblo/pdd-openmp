@@ -352,13 +352,13 @@ long long get_group(POINT_T R, int L)  {
 
 
 POINT_T nextpoint(POINT_T P, long long a, long long p,
-                    long long order, int L, POINT_T *Triplet)
+                    long long order, int L, IT_POINT_SET *Triplet)
 {
     POINT_T Y;
     long long g;
 
     g = get_group(P, L);
-    Y = addpoints(P, Triplet[g], a, p, order);
+    Y = addpoints(P, Triplet->itpoint[g], a, p, order);
 
     return(Y);
 }
@@ -800,8 +800,6 @@ worker_it_task(long long a, long long p, long long order,
 {
     // Calculate the next point
     X[id] = nextpoint(X[id], a, p, order, L, &itPsets[id]);
-		//printf("x: %d %d %d %d\n", X[id].x, X[id].y, X[id].r, X[id].s);
-
 
     // Handle the new point checking if the key has been found
     handle_newpoint(X[id], order, key);
