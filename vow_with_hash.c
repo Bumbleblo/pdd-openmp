@@ -929,7 +929,7 @@ int main()
 
 		#pragma omp parallel for private(id)
         for (id=0; id < nworkers; id++) {
-            setup_worker(&X, a, p, maxorder, L, nbits, id, algorithm);
+            setup_worker(X, a, p, maxorder, L, nbits, id, algorithm);
             //fflush(stdout);
         }
         printf("\nRun[%3d] iterations: ", run);
