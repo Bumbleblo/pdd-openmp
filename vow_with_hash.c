@@ -7,7 +7,8 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
-#include <omp.h>
+
+#include "mpi.h"
 
 
 // Defines that the user can control
@@ -29,7 +30,7 @@
 // GLOBAL VARIABLES
 
 // CONSTANT VALUED VARIABLES
-const int algorithm = VOW;
+const int algorithm = HARES;
 const int L = NUM_IT_FUNCTION_INTERVALS;
 const int nbits = MODULO_NUM_BITS;
 const int nworkers = NUM_WORKERS;
@@ -490,7 +491,6 @@ long long equal(POINT_T X1, POINT_T X2)  {
 void check_slot_and_store(POINT_T X, POINT_T *Y, int token, int *retval)
 {
 
-	#pragma omp critical(hashtable)
     {
         uint32_t index1 = (uint32_t) X.y, index2 = (uint32_t) ((X.y + 2) >> 1);
         POINT_T H;
@@ -737,6 +737,7 @@ setup_worker(POINT_T *X, long long a, long long p, long long order,
 
     // Calculate the initial point for this worker
     initial_point(&initX[id], Psums, Qsums, nbits, id, alg, nworkers, a, p, order);
+
     X[id] = initX[id];
 
     return;
@@ -811,223 +812,230 @@ worker_it_task(long long a, long long p, long long order,
 
 
 
-int main()
+int main(int argc, char *argv[])
 {
 
-    omp_set_num_threads(NUM_WORKERS);
-	long long a, b, p, maxorder, k;
-	long long key;
-	int it_number, minits, maxits = 0, run = 1;
-	//POINT_T G; 
-	POINT_T Q, P;
-	//time_t  init, term;
-	double start, end;
-	double convergence_time, setup_time;
-	//double average_it_num = 0.0, average_it_time = 0.0;
-	double total_it_num = 0.0, total_it_time = 0.0;
-	//uint32_t bitmask;
-	int i, id;
+    int rank, size;
 
-    double run_start, run_end;
-    run_start = get_wall_time();
+    MPI_Init(&argc, &argv);
 
-    double run_real_start, run_real_end;
-    run_real_start = get_cpu_time();
-
-	switch (algorithm)  {
-        case VOW:   printf("\n\nPOLLARD RHO ALGORITHM  --  VOW\n");                  break;
-        case TOHA:  printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises and Hares\n");  break;
-        case HARES: printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises\n");            break;
-	}
-
-	/////////////////////////////////////////////////////////////////////////
-	//
-	//     ELLIPTIC CURVE EQUATION (WEIERSTRASS FORM)
-	//
-	//                 Y^2 = X^3 + aX + b
-	//
-	/////////////////////////////////////////////////////////////////////////
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 
-    printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
+    if(rank == 0){
+        long long a, b, p, maxorder, k;
+        long long key;
+        int it_number, minits, maxits = 0, run = 1;
+        //POINT_T G; 
+        POINT_T Q, P;
+        //time_t  init, term;
+        double start, end;
+        double convergence_time, setup_time;
+        //double average_it_num = 0.0, average_it_time = 0.0;
+        double total_it_num = 0.0, total_it_time = 0.0;
+        //uint32_t bitmask;
+        int i, id;
 
-   // Pick elliptic curve parameters for chosen number of bits of the prime field module p
-    switch (nbits)  {
-        case 16:
-            a = 1;   b = 44;         p = 16747;                         // 16 bits
-            maxorder = 16931;        P.x = 1; P.y = 5626;
-            k = 8047;
-            break;
-        case 20:
-            a = 1;   b = 44;         p = 1048507;                       // 20 bits
-            maxorder = 1049101;      P.x = 373173; P.y = 395411;
-            k = 3051;
-            break;
-        case 24:
-            a = 1;   b = 44;         p = 16774421;                       // 24 bits
-            maxorder = 16770883;     P.x = 4530807; P.y = 1256865;
-            k = 2349;
-            break;
-        case 28:
-            a = 1;   b = 44;         p = 268434997;                      // 28 bits
-            maxorder = 268446727;    P.x = 47793986; P.y = 101136283;
-            k = 7514;
-            break;
-       case 32:
-            a = 1;   b = 44;         p = 4294966981;                      // 32 bits
-            maxorder = 4295084473;   P.x = 3437484969; P.y = 579918983;
-            k = 2037;
-            break;
-        default:
-            printf("\n\nnbits is not in the defined set (16, 20, 24, 28, 32)\n\n");
-            exit(-1);
+        double run_start, run_end;
+        run_start = get_wall_time();
+
+        double run_real_start, run_real_end;
+        run_real_start = get_cpu_time();
+
+        switch (algorithm)  {
+            case VOW:   printf("\n\nPOLLARD RHO ALGORITHM  --  VOW\n");                  break;
+            case TOHA:  printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises and Hares\n");  break;
+            case HARES: printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises\n");            break;
+        }
+
+        /////////////////////////////////////////////////////////////////////////
+        //
+        //     ELLIPTIC CURVE EQUATION (WEIERSTRASS FORM)
+        //
+        //                 Y^2 = X^3 + aX + b
+        //
+        /////////////////////////////////////////////////////////////////////////
+
+
+        printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
+
+       // Pick elliptic curve parameters for chosen number of bits of the prime field module p
+        switch (nbits)  {
+            case 16:
+                a = 1;   b = 44;         p = 16747;                         // 16 bits
+                maxorder = 16931;        P.x = 1; P.y = 5626;
+                k = 8047;
+                break;
+            case 20:
+                a = 1;   b = 44;         p = 1048507;                       // 20 bits
+                maxorder = 1049101;      P.x = 373173; P.y = 395411;
+                k = 3051;
+                break;
+            case 24:
+                a = 1;   b = 44;         p = 16774421;                       // 24 bits
+                maxorder = 16770883;     P.x = 4530807; P.y = 1256865;
+                k = 2349;
+                break;
+            case 28:
+                a = 1;   b = 44;         p = 268434997;                      // 28 bits
+                maxorder = 268446727;    P.x = 47793986; P.y = 101136283;
+                k = 7514;
+                break;
+           case 32:
+                a = 1;   b = 44;         p = 4294966981;                      // 32 bits
+                maxorder = 4295084473;   P.x = 3437484969; P.y = 579918983;
+                k = 2037;
+                break;
+            default:
+                printf("\n\nnbits is not in the defined set (16, 20, 24, 28, 32)\n\n");
+                exit(-1);
+        }
+
+
+        if (a == 1) printf("\nElliptic curve:   y^2 = x^3 + x + %lld      (mod %lld, %d bits)\n\n", b, p, nbits);
+        else printf("\nElliptic curve:   y^2 = x^3 + %lldx + %lld      (mod %lld, %d bits)\n\n", a, b, p, nbits);
+
+        printf("Order of the curve = %lld\n\n", maxorder);
+
+        printf("Number of workers = %d\n\n", nworkers);
+
+        // Calculating point Q = kP
+        printf("Calculating point Q = kP      (k = %lld)\n", k);
+        calc_P_sums(P, a, p, maxorder, nbits);
+        calc_Q(&Q, Psums, k, nbits, a, p);
+        calc_Q_sums(Q, a, p, maxorder, nbits);
+
+        printf("\n");
+        printf("          P = (%8lld, %8lld)          (Base Point)\n", P.x, P.y);
+        printf("          Q = (%8lld, %8lld)          (Q = kP    )\n\n\n", Q.x, Q.y);
+
+        // Initialize minits
+        minits = maxorder;
+
+        // Loop to calculate the desired secret key (k) MAX_RUNS times, each one
+        // with randomly chosen step and starting points for each thread (worker).
+        // Remember the number of iterations each run took to find the key (k).
+        // Then calculate the expected (average) number of iterations that this
+        // calculation takes.
+
+        while (1) {
+            
+            // Initialize the number of iterations
+            it_number = 1;
+
+            // Initialize the random generator
+            srand(time(NULL));
+
+            // Start counting the setup time
+            start = get_wall_time();
+
+            // Calculate the iteration point set base (randomly)
+            rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
+
+            // Set up the running environment for the search for all workers
+            printf("Run[%3d] setup:    ", run);
+
+            for (id=0; id < nworkers; id++) {
+                setup_worker(X, a, p, maxorder, L, nbits, id, algorithm);
+                //fflush(stdout);
+            }
+            printf("\nRun[%3d] iterations: ", run);
+
+            // Stop counting the setup time and calculate it
+            end = get_wall_time();
+
+            setup_time = ((double)(end - start));
+
+            // Start counting the execution time
+            start = get_wall_time();
+                    
+            for ( ; ; ) {
+
+                /*
+                 * Usar a função worker_it_task it_number vezes, caso
+                 * encontre sai da interação se não continua todas as interações
+                 *  bug: faz mais de it_number interações
+                 */
+                long long rkey = -1;
+                for (id=0; id < nworkers; id++) {
+                    worker_it_task(a, p, maxorder, L, id, &key);
+                                
+                    // key -> !NOT_KEY  key == Key_found 
+                    if (key != NO_KEY_FOUND){
+                        rkey = key;
+                    }
+                }
+                //fflush(stdout);
+
+                //if (abs(reductedKey) != abs(NO_KEY_FOUND)) {
+                if (rkey != NO_KEY_FOUND) {
+                    key = rkey;
+                    printf("  (%d its)\n", it_number);
+                    break;
+                }
+                it_number++;
+            }
+
+            // Recover the current time and calculate the execution time
+            end = get_wall_time();
+            convergence_time = ((double)(end - start));
+
+            // Choose text for describing the algorithm iteration point sets
+            char *stepdef;
+            switch (algorithm)  {
+                case VOW:   stepdef = "all-equal";                break;
+                case TOHA:  stepdef = "1/2 equal + 1/2 varying";  break;
+                case HARES: stepdef = "all-varying";              break;
+            }
+
+            // Run converged. Print information for it.
+            printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
+                   run, it_number, key, nworkers);
+            printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
+                   setup_time, convergence_time, stepdef);
+
+            // Keep track of the minimum number of iterations needed to converge in all runs.
+            if (it_number < minits) {
+                minits = it_number;
+            }
+
+            if (it_number > maxits) {
+                maxits = it_number;
+            }
+
+            total_it_num  = total_it_num  + it_number;
+            total_it_time = total_it_time + convergence_time;
+
+            // Cleanup the hash table
+            for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
+
+            if (run == MAX_RUNS) break;
+            run++;
+        }   // Loop to do various different executions __ while (1)
+
+         // Final statistics
+        printf("\n\nFINAL STATISTICS\n\n");
+        printf("Runs = %d, Min Its # = %d,  Max Its = %d, Av. Iteration # = %.0lf, ", run, minits, maxits, total_it_num/MAX_RUNS);
+        printf("Av. Iteration Time = %.1lf s, Total Time = %.1lf s\n\n", total_it_time/run, total_it_time);
+        //fflush(stdout);
+
+
+
+        run_end = get_wall_time();
+        run_real_end = get_cpu_time();
+
+        double tp = ((double) run_end - run_start);
+        double t1 = ((double) run_real_end - run_real_start);
+
+        printf("T(1): %.2lf\n", t1);
+        printf("T(p): %.2lf\n", tp);
+        printf("p: %d\n", NUM_WORKERS);
+        printf("S(P): %.2lf\n", t1/tp);
+        printf("E(P): %.10lf\n", (t1/tp)/((double)p));
     }
 
-
-	if (a == 1) printf("\nElliptic curve:   y^2 = x^3 + x + %lld      (mod %lld, %d bits)\n\n", b, p, nbits);
-	else printf("\nElliptic curve:   y^2 = x^3 + %lldx + %lld      (mod %lld, %d bits)\n\n", a, b, p, nbits);
-
-	printf("Order of the curve = %lld\n\n", maxorder);
-
-	printf("Number of workers = %d\n\n", nworkers);
-
-    // Calculating point Q = kP
-    printf("Calculating point Q = kP      (k = %lld)\n", k);
-    calc_P_sums(P, a, p, maxorder, nbits);
-    calc_Q(&Q, Psums, k, nbits, a, p);
-    calc_Q_sums(Q, a, p, maxorder, nbits);
-
-    printf("\n");
-    printf("          P = (%8lld, %8lld)          (Base Point)\n", P.x, P.y);
-    printf("          Q = (%8lld, %8lld)          (Q = kP    )\n\n\n", Q.x, Q.y);
-
-    // Initialize minits
-    minits = maxorder;
-
-    // Loop to calculate the desired secret key (k) MAX_RUNS times, each one
-    // with randomly chosen step and starting points for each thread (worker).
-    // Remember the number of iterations each run took to find the key (k).
-    // Then calculate the expected (average) number of iterations that this
-    // calculation takes.
-
-    while (1) {
-		
-        // Initialize the number of iterations
-        it_number = 1;
-
-        // Initialize the random generator
-        srand(time(NULL));
-
-        // Start counting the setup time
-        start = get_wall_time();
-
-        // Calculate the iteration point set base (randomly)
-        rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
-
-        // Set up the running environment for the search for all workers
-        printf("Run[%3d] setup:    ", run);
-
-		#pragma omp parallel for private(id)
-        for (id=0; id < nworkers; id++) {
-            setup_worker(X, a, p, maxorder, L, nbits, id, algorithm);
-            //fflush(stdout);
-        }
-        printf("\nRun[%3d] iterations: ", run);
-
-        // Stop counting the setup time and calculate it
-        end = get_wall_time();
-
-        setup_time = ((double)(end - start));
-
-        // Start counting the execution time
-        start = get_wall_time();
-				
-        for ( ; ; ) {
-
-            /*
-             * Usar a função worker_it_task it_number vezes, caso
-             * encontre sai da interação se não continua todas as interações
-             *  bug: faz mais de it_number interações
-             */
-            long long rkey = -1;
-            #pragma omp parallel for private(id, key) reduction(max : rkey)
-            for (id=0; id < nworkers; id++) {
-                worker_it_task(a, p, maxorder, L, id, &key);
-							
-                // key -> !NOT_KEY  key == Key_found 
-                if (key != NO_KEY_FOUND){
-                    rkey = key;
-                }
-            }
-            //fflush(stdout);
-
-            //if (abs(reductedKey) != abs(NO_KEY_FOUND)) {
-            if (rkey != NO_KEY_FOUND) {
-				key = rkey;
-                printf("  (%d its)\n", it_number);
-                break;
-            }
-            it_number++;
-        }
-
-        // Recover the current time and calculate the execution time
-        end = get_wall_time();
-        convergence_time = ((double)(end - start));
-
-        // Choose text for describing the algorithm iteration point sets
-        char *stepdef;
-        switch (algorithm)  {
-            case VOW:   stepdef = "all-equal";                break;
-            case TOHA:  stepdef = "1/2 equal + 1/2 varying";  break;
-            case HARES: stepdef = "all-varying";              break;
-        }
-
-        // Run converged. Print information for it.
-        printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
-               run, it_number, key, nworkers);
-        printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
-               setup_time, convergence_time, stepdef);
-
-        // Keep track of the minimum number of iterations needed to converge in all runs.
-        if (it_number < minits) {
-            minits = it_number;
-        }
-
-        if (it_number > maxits) {
-            maxits = it_number;
-        }
-
-        total_it_num  = total_it_num  + it_number;
-        total_it_time = total_it_time + convergence_time;
-
-        // Cleanup the hash table
-        #pragma omp parallel for private(i)
-        for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
-
-        if (run == MAX_RUNS) break;
-        run++;
-    }   // Loop to do various different executions __ while (1)
-
-     // Final statistics
-    printf("\n\nFINAL STATISTICS\n\n");
-    printf("Runs = %d, Min Its # = %d,  Max Its = %d, Av. Iteration # = %.0lf, ", run, minits, maxits, total_it_num/MAX_RUNS);
-    printf("Av. Iteration Time = %.1lf s, Total Time = %.1lf s\n\n", total_it_time/run, total_it_time);
-    //fflush(stdout);
-
-
-
-    run_end = get_wall_time();
-    run_real_end = get_cpu_time();
-
-    double tp = ((double) run_end - run_start);
-    double t1 = ((double) run_real_end - run_real_start);
-
-    printf("T(1): %.2lf\n", t1);
-    printf("T(p): %.2lf\n", tp);
-    printf("p: %d\n", NUM_WORKERS);
-    printf("S(P): %.2lf\n", t1/tp);
-    printf("E(P): %.10lf\n", (t1/tp)/((double)p));
-
+    MPI_Finalize();
 	exit(0);
 }
 
