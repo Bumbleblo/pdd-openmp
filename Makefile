@@ -20,7 +20,7 @@ view-profile:
 	$(PROF) prog.out gmon.out
 
 run:
-	@mpirun prog.out 
+	@mpirun ./prog.out 
 
 clean:
 	@rm prog.out
