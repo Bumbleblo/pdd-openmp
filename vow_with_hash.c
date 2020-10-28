@@ -21,7 +21,7 @@
 #define NUM_THREADS                NUM_WORKERS
 
 #ifndef MODULO_NUM_BITS
-    #define MODULO_NUM_BITS            20
+    #define MODULO_NUM_BITS            16 
 #endif
 
 // defined by us 
@@ -949,7 +949,7 @@ int main(int argc, char *argv[])
         
         // Initialize the number of iterations
         it_number = 1;
-
+				
 
         if(rank == 0){
           // Start counting the setup time
@@ -1043,9 +1043,15 @@ int main(int argc, char *argv[])
           total_it_num  = total_it_num  + it_number;
           total_it_time = total_it_time + convergence_time;
 
-        // Cleanup the hash table
-        for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
+					// Cleanup the hash table
+					for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
+					for (i = 1; i < nworkers; i++){
+						MPI_Send(hashtable, TABLESIZE, point_type, i, 42, MPI_COMM_WORLD);
+					}
         }
+				else{
+						MPI_Recv(hashtable, TABLESIZE, point_type, 0, 42, MPI_COMM_WORLD, &status);
+				}
 
 
         if (run == MAX_RUNS) break;
