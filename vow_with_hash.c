@@ -12,10 +12,10 @@
 
 
 // Defines that the user can control
-#define MAX_RUNS                    10
+#define MAX_RUNS                    50
 
 #ifndef NUM_WORKERS
-    #define NUM_WORKERS                2
+    #define NUM_WORKERS                3
 #endif
 
 #define NUM_THREADS                NUM_WORKERS
@@ -85,149 +85,149 @@ void printP(POINT_T X)  {
 
 POINT_T add_2P(POINT_T p, long long a, long long mod)
 {
-	POINT_T val;
-	long long lambda, num, den, invden;
+  POINT_T val;
+  long long lambda, num, den, invden;
 
-	if (p.y == 0)
+  if (p.y == 0)
     {
-    	// 2P is equal to O(0, 0)
-    	val.x = 0;
-    	val.y = 0;
-    	return(val);
+      // 2P is equal to O(0, 0)
+      val.x = 0;
+      val.y = 0;
+      return(val);
     }
 
-	num = (3*p.x*p.x + a) % mod;
-	while (num < 0) {
-		num = num + mod;
-	}
-	den = 2*p.y;
-	while (den < 0) {
+  num = (3*p.x*p.x + a) % mod;
+  while (num < 0) {
+    num = num + mod;
+  }
+  den = 2*p.y;
+  while (den < 0) {
         den += mod;
     }
     den = den % mod;
 
-	invden = multiplicative_inverse(den, mod);
-	lambda = (num * invden) % mod;
+  invden = multiplicative_inverse(den, mod);
+  lambda = (num * invden) % mod;
 
-	val.x = (lambda*lambda - p.x - p.x);
-	while (val.x < 0) {
-	    val.x += mod;
-	}
-	val.x = val.x % mod;
+  val.x = (lambda*lambda - p.x - p.x);
+  while (val.x < 0) {
+      val.x += mod;
+  }
+  val.x = val.x % mod;
 
-	val.y = (lambda*(p.x - val.x) - p.y);
-		while (val.y < 0) {
-	    val.y += mod;
-	}
-	val.y = val.y % mod;
+  val.y = (lambda*(p.x - val.x) - p.y);
+    while (val.y < 0) {
+      val.y += mod;
+  }
+  val.y = val.y % mod;
 
-	return(val);
+  return(val);
 }
 
 
 POINT_T add_PQ(POINT_T p, POINT_T q, long long mod)
 {
-	POINT_T val;
-	long long lambda, num, den, invden;
+  POINT_T val;
+  long long lambda, num, den, invden;
 
-	// Test if p or q is the point at infinite
-	if (p.x == 0  &&  p.y == 0)  return(q);
-	if (q.x == 0  &&  q.y == 0)  return(p);
+  // Test if p or q is the point at infinite
+  if (p.x == 0  &&  p.y == 0)  return(q);
+  if (q.x == 0  &&  q.y == 0)  return(p);
 
-	if (p.x == q.x) {
-    	val.x = 0;
-    	val.y = 0;
-    	return(val);
+  if (p.x == q.x) {
+      val.x = 0;
+      val.y = 0;
+      return(val);
     }
 
-	num = (q.y - p.y);
-	while (num < 0) {
-		num = num + mod;
-	}
-	num = num % mod;
+  num = (q.y - p.y);
+  while (num < 0) {
+    num = num + mod;
+  }
+  num = num % mod;
 
-	den = q.x - p.x;
-	while (den < 0) {
+  den = q.x - p.x;
+  while (den < 0) {
         den += mod;
     }
     den = den % mod;
 
-	invden = multiplicative_inverse(den, mod);
-	lambda = (num*invden) % mod;
+  invden = multiplicative_inverse(den, mod);
+  lambda = (num*invden) % mod;
 
-	val.x = (lambda*lambda - p.x - q.x);
-	while (val.x < 0) {
-	    val.x += mod;
-	}
-	val.x = val.x % mod;
+  val.x = (lambda*lambda - p.x - q.x);
+  while (val.x < 0) {
+      val.x += mod;
+  }
+  val.x = val.x % mod;
 
-	val.y = (lambda*(p.x - val.x) - p.y);
-	while (val.y < 0) {
-	    val.y += mod;
-	}
-	val.y = val.y % mod;
+  val.y = (lambda*(p.x - val.x) - p.y);
+  while (val.y < 0) {
+      val.y += mod;
+  }
+  val.y = val.y % mod;
 
-	return(val);
+  return(val);
 }
 
 
 POINT_T subpoints(POINT_T p, POINT_T q, long long a, long long mod)
 {
-	POINT_T val;
+  POINT_T val;
 
-	q.y = -q.y;
-	while (q.y < 0) {
-		q.y += mod;
-	}
+  q.y = -q.y;
+  while (q.y < 0) {
+    q.y += mod;
+  }
 
-	if (p.x==q.x && p.y==q.y)  val = add_2P(p, a, mod);
-	else val = add_PQ(p, q, mod);
+  if (p.x==q.x && p.y==q.y)  val = add_2P(p, a, mod);
+  else val = add_PQ(p, q, mod);
 
-	return(val);
+  return(val);
 }
 
 
 POINT_T addpoints(POINT_T P, POINT_T Q, long long a , long long p, long long order)
 {
-	POINT_T val;
+  POINT_T val;
 
-	if (P.x==Q.x && P.y==Q.y)  val = add_2P(P, a, p);
-	else val = add_PQ(P, Q, p);
+  if (P.x==Q.x && P.y==Q.y)  val = add_2P(P, a, p);
+  else val = add_PQ(P, Q, p);
 
-	if (order != 0) {
+  if (order != 0) {
         val.r = (P.r + Q.r) % order;
         val.s = (P.s + Q.s) % order;
-	}
+  }
 
-	return(val);
+  return(val);
 }
 
 
 POINT_T multpoint(long long n, POINT_T P, long long a, long long mod, long long order)
 {
-	long long i=1;
-	POINT_T val = P;
+  long long i=1;
+  POINT_T val = P;
 
-	if (n == 1) return(P);
-	if (n < 0)  { val.x = -1;  val.y = -1;  return(val); }
-	if (n == 0) { val.x = 0;   val.y = 0;   return(val); }
+  if (n == 1) return(P);
+  if (n < 0)  { val.x = -1;  val.y = -1;  return(val); }
+  if (n == 0) { val.x = 0;   val.y = 0;   return(val); }
 
-	do {
-		val = addpoints(val, P, a, mod, order);
-		i++;
-	} while (i < n);
+  do {
+    val = addpoints(val, P, a, mod, order);
+    i++;
+  } while (i < n);
 
-	return(val);
+  return(val);
 }
 
 
 long long multiplicative_inverse(long long num, long long modulo)
 {
-	long long val=0;
+  long long val=0;
     long long a, b, q, r, x, y;
-	long long rest, r1, r2, x1=1, x2=0, y1=0, y2=1;
+  long long rest, r1, r2, x1=1, x2=0, y1=0, y2=1;
 
-	if (num == 1) return(1);
+  if (num == 1) return(1);
 
     if (num >= modulo) {   a = num;   b = modulo;   }
     else {   a = modulo;   b = num;   }
@@ -238,103 +238,103 @@ long long multiplicative_inverse(long long num, long long modulo)
     long long i = 1, gcd;
 
     do {
-    	rest = r2 % r1;
+      rest = r2 % r1;
 
-    	if (rest == 0) {
+      if (rest == 0) {
 
-    		if (DEBUG) {
-    		    printf("\n\n_______________________________________________________________________________\n\n\n");
-						printf("WILL BREAK:   rest = (r2 %% r1) = 0      r2=%lld    r1=%lld\n\n", r2, r1);
-    		    printf("_______________________________________________________________________________\n\n");
-    	    }
+        if (DEBUG) {
+            printf("\n\n_______________________________________________________________________________\n\n\n");
+            printf("WILL BREAK:   rest = (r2 %% r1) = 0      r2=%lld    r1=%lld\n\n", r2, r1);
+            printf("_______________________________________________________________________________\n\n");
+          }
 
-    	    break;
-    	}
+          break;
+      }
 
-    	q = r2/r1;
-    	r = rest;
-    	x = x1 - q*x2;
-    	y = y1 - q*y2;
+      q = r2/r1;
+      r = rest;
+      x = x1 - q*x2;
+      y = y1 - q*y2;
 
-    	if (DEBUG) {
+      if (DEBUG) {
             printf("\n\n\na[%lld]=%lld   b[%lld]=%lld   q[%lld]=%lld", i, r2, i, r1, i, q);
-		    printf("    r[%lld]=%lld    x[%lld]=%lld    y[%lld]=%lld\n\n", i, r, i, x, i, y);
-		    printf("%lld = %lld*(%lld) + %lld\n\n", r2, q, r1, r);
-		    printf("%lld = %lld*(%lld) + %lld*(%lld)\n", r, a, x, b, y);
-	    }
+        printf("    r[%lld]=%lld    x[%lld]=%lld    y[%lld]=%lld\n\n", i, r, i, x, i, y);
+        printf("%lld = %lld*(%lld) + %lld\n\n", r2, q, r1, r);
+        printf("%lld = %lld*(%lld) + %lld*(%lld)\n", r, a, x, b, y);
+      }
 
-		/* At his point  r = a*x + b*y  */
-    	if (r != (a*x + b*y))  {
-    		printf("\nError: r != (a * x   +   b * y)\n\n");
-    		printf("%lld  !=  (%lld * %lld  +  %lld * %lld)      q=%lld\n", r, a, x, b, y, q);
-    		break;
+    /* At his point  r = a*x + b*y  */
+      if (r != (a*x + b*y))  {
+        printf("\nError: r != (a * x   +   b * y)\n\n");
+        printf("%lld  !=  (%lld * %lld  +  %lld * %lld)      q=%lld\n", r, a, x, b, y, q);
+        break;
         }
 
         r2 = r1;
-		r1 = r;
+    r1 = r;
 
-		x1 = x2;
-		x2 = x;
+    x1 = x2;
+    x2 = x;
 
-		y1 = y2;
-		y2 = y;
+    y1 = y2;
+    y2 = y;
 
-		i++;
+    i++;
     } while (1);
 
-	if (r == 0) {
-	    if (num <= modulo) gcd = num;
-		else gcd = modulo;
-	}
-	else gcd = r;
+  if (r == 0) {
+      if (num <= modulo) gcd = num;
+    else gcd = modulo;
+  }
+  else gcd = r;
 
-	if (DEBUG) {
-	    printf("\ngcd (%lld, %lld) = %lld", num, modulo, gcd);
-	    printf("      x = %lld      y = %lld\n\n", x, y);
-	    printf("%lld = %lld*(%lld) + %lld*(%lld)\n\n", gcd, a, x, b, y);
+  if (DEBUG) {
+      printf("\ngcd (%lld, %lld) = %lld", num, modulo, gcd);
+      printf("      x = %lld      y = %lld\n\n", x, y);
+      printf("%lld = %lld*(%lld) + %lld*(%lld)\n\n", gcd, a, x, b, y);
     }
 
-	if (gcd == 1)  {
-		if (num >= modulo)     /*  a == num,  check x */
-		    if (x > 0) {
+  if (gcd == 1)  {
+    if (num >= modulo)     /*  a == num,  check x */
+        if (x > 0) {
 
-		    	printf("The multiplicative inverse of %lld mod %lld is %lld\n\n", a, b, x);
-		    	if (DEBUG) {
-		            printf("The multiplicative inverse of %lld mod %lld is %lld\n\n", a, b, x);
-		            printf("(%lld * %lld) mod %lld = %lld\n\n", a, x, b, a*x % b);
-		        }
-		        val = x;
-		    }
-		    else {
-		    	if (DEBUG)  {
-		            printf("The multiplicative inverse of %lld mod %lld is (%lld - %lld) = %lld\n\n", a, b, b, -x, b+x);
-		            printf("(%lld * %lld) mod %lld = %lld\n\n", a, b+x, b, (a*(b+x)) % b);
-		        }
-		        val = b+x;
-	        }
-	    else     /* b == num,  check y */
-	        if (y > 0) {
-	        	if (DEBUG)  {
-		            printf("The multiplicative inverse of %lld mod %lld is %lld\n\n", b, a, y);
-		            printf("(%lld * %lld) mod %lld = %lld\n\n", b, y, a, b*y % a);
-		        }
-		        val = y;
-		    }
-		    else {
-		    	if (DEBUG) {
-		            printf("The multiplicative inverse of %lld mod %lld is (%lld - %lld) = %lld\n\n", b, a, a, -y, a+y);
-		            printf("(%lld * %lld) mod %lld = %lld\n\n", b, a+y, a, (b*(a+y)) % a);
-		        }
-		        val = a+y;
-	        }
-	}
-	else {
-		printf("There is no multiplicative inverse of %lld mod %lld\n\n", num, modulo);
-		printf("gcd (%lld, %lld) = %lld\n\n", a, b, gcd);
-		printf("gcd != 1 --> %lld and %lld are not relatively prime\n\n", a, b);
-	}
+          printf("The multiplicative inverse of %lld mod %lld is %lld\n\n", a, b, x);
+          if (DEBUG) {
+                printf("The multiplicative inverse of %lld mod %lld is %lld\n\n", a, b, x);
+                printf("(%lld * %lld) mod %lld = %lld\n\n", a, x, b, a*x % b);
+            }
+            val = x;
+        }
+        else {
+          if (DEBUG)  {
+                printf("The multiplicative inverse of %lld mod %lld is (%lld - %lld) = %lld\n\n", a, b, b, -x, b+x);
+                printf("(%lld * %lld) mod %lld = %lld\n\n", a, b+x, b, (a*(b+x)) % b);
+            }
+            val = b+x;
+          }
+      else     /* b == num,  check y */
+          if (y > 0) {
+            if (DEBUG)  {
+                printf("The multiplicative inverse of %lld mod %lld is %lld\n\n", b, a, y);
+                printf("(%lld * %lld) mod %lld = %lld\n\n", b, y, a, b*y % a);
+            }
+            val = y;
+        }
+        else {
+          if (DEBUG) {
+                printf("The multiplicative inverse of %lld mod %lld is (%lld - %lld) = %lld\n\n", b, a, a, -y, a+y);
+                printf("(%lld * %lld) mod %lld = %lld\n\n", b, a+y, a, (b*(a+y)) % a);
+            }
+            val = a+y;
+          }
+  }
+  else {
+    printf("There is no multiplicative inverse of %lld mod %lld\n\n", num, modulo);
+    printf("gcd (%lld, %lld) = %lld\n\n", a, b, gcd);
+    printf("gcd != 1 --> %lld and %lld are not relatively prime\n\n", a, b);
+  }
 
-	return(val);
+  return(val);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -804,7 +804,7 @@ worker_it_task(long long a, long long p, long long order,
 
     // Handle the new point checking if the key has been found
     handle_newpoint(X[id], order, &key);
-		return key;
+    return key;
 }
 
 
@@ -839,7 +839,7 @@ int main(int argc, char *argv[])
     MPI_Type_commit(&point_type);
 
 
-		MPI_Datatype point_set_type;
+    MPI_Datatype point_set_type;
     int lengths[1] = { NUM_IT_FUNCTION_INTERVALS };
     const MPI_Aint displacements[1] = { 0 };
     MPI_Datatype it_types[1] = { point_type };
@@ -879,8 +879,9 @@ int main(int argc, char *argv[])
     //
     /////////////////////////////////////////////////////////////////////////
 
-
-    printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
+    if(rank == 0){
+      printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
+    }
 
    // Pick elliptic curve parameters for chosen number of bits of the prime field module p
     switch (nbits)  {
@@ -914,23 +915,26 @@ int main(int argc, char *argv[])
             exit(-1);
     }
 
+    if(rank == 0){
+      if (a == 1) printf("\nElliptic curve:   y^2 = x^3 + x + %lld      (mod %lld, %d bits)\n\n", b, p, nbits);
+      else printf("\nElliptic curve:   y^2 = x^3 + %lldx + %lld      (mod %lld, %d bits)\n\n", a, b, p, nbits);
 
-    if (a == 1) printf("\nElliptic curve:   y^2 = x^3 + x + %lld      (mod %lld, %d bits)\n\n", b, p, nbits);
-    else printf("\nElliptic curve:   y^2 = x^3 + %lldx + %lld      (mod %lld, %d bits)\n\n", a, b, p, nbits);
+      printf("Order of the curve = %lld\n\n", maxorder);
 
-    printf("Order of the curve = %lld\n\n", maxorder);
+      printf("Number of workers = %d\n\n", nworkers);
 
-    printf("Number of workers = %d\n\n", nworkers);
-
-    // Calculating point Q = kP
-    printf("Calculating point Q = kP      (k = %lld)\n", k);
+      // Calculating point Q = kP
+      printf("Calculating point Q = kP      (k = %lld)\n", k);
+    }
     calc_P_sums(P, a, p, maxorder, nbits);
     calc_Q(&Q, Psums, k, nbits, a, p);
     calc_Q_sums(Q, a, p, maxorder, nbits);
 
-    printf("\n");
-    printf("          P = (%8lld, %8lld)          (Base Point)\n", P.x, P.y);
-    printf("          Q = (%8lld, %8lld)          (Q = kP    )\n\n\n", Q.x, Q.y);
+    if(rank == 0){
+      printf("\n");
+      printf("          P = (%8lld, %8lld)          (Base Point)\n", P.x, P.y);
+      printf("          Q = (%8lld, %8lld)          (Q = kP    )\n\n\n", Q.x, Q.y);
+    }
 
     // Initialize minits
     minits = maxorder;
@@ -946,114 +950,115 @@ int main(int argc, char *argv[])
         // Initialize the number of iterations
         it_number = 1;
 
-        // Initialize the random generator
-        srand(time(NULL));
-
-        // Start counting the setup time
-        start = get_wall_time();
-
-        // Calculate the iteration point set base (randomly)
-
-        // Set up the running environment for the search for all workers
-        printf("Run[%3d] setup:    ", run);
 
         if(rank == 0){
-						rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
+          // Start counting the setup time
+          start = MPI_Wtime();
+          printf("Run[%3d] setup:    ", run);
+        }
+
+
+        if(rank == 0){
+            // Initialize the random generator
+            srand(time(NULL));
+
+            // Calculate the iteration point set base (randomly)
+            rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
+
             for(int id = 1; id < nworkers; id++){
-							MPI_Send(&id, 1, MPI_INT, id, 42, MPI_COMM_WORLD);
-              MPI_Send(&itPsetBase, id, point_set_type, id, 42, MPI_COMM_WORLD);
+              MPI_Send(&id, 1, MPI_INT, id, 42, MPI_COMM_WORLD);
+              MPI_Send(&itPsetBase, 1, point_set_type, id, 42, MPI_COMM_WORLD);
             }
+
+            // Set up the running environment for the search for master worker
             setup_worker(X, a, p, maxorder, L, nbits, 0, algorithm);
+
             for(id = 1; id < nworkers; id++){
                 MPI_Recv(&X[id], 1, point_type,  id, 42, MPI_COMM_WORLD, &status);
             }
+
         } else {
             int id_slv;
             MPI_Recv(&id_slv, 1, MPI_INT,  0, 42, MPI_COMM_WORLD, &status);
-            MPI_Recv(&itPsetBase, id_slv, point_set_type,  0, 42, MPI_COMM_WORLD, &status);
+            MPI_Recv(&itPsetBase, 1, point_set_type,  0, 42, MPI_COMM_WORLD, &status);
             setup_worker(X, a, p, maxorder, L, nbits, 1, algorithm);
             MPI_Send(&X[id_slv], 1, point_type, 0, 42, MPI_COMM_WORLD);
+        } 
 
-            //MPI_Send(&X[id_slv], 1, point_type, 0, 42, MPI_COMM_WORLD);
-       	} 
-				//return 0;
+        if(rank == 0){
+          // Stop counting the setup time and calculate it
+          end = MPI_Wtime();
+          setup_time = end - start;
 
-        //for (id=0; id < nworkers; id++) {
-        //    setup_worker(X, a, p, maxorder, L, nbits, id, algorithm);
-        //    //fflush(stdout);
-        //}
-        //if(rank == 0){
-						
-				// Stop counting the setup time and calculate it
-				end = get_wall_time();
+          // Start counting the execution time
+          start = MPI_Wtime();
+        }
 
-				setup_time = ((double)(end - start));
-
-				// Start counting the execution time
-				start = get_wall_time();
                     
-                /*
-                 * Usar a função worker_it_task it_number vezes, caso
-                 * encontre sai da interação se não continua todas as interações
-                 *  bug: faz mais de it_number interações
-                 */
-				long long local_key;
-				int local_it_number;
-				while(1){
-						local_key = worker_it_task(a, p, maxorder, L, rank, local_key);
-						MPI_Allreduce(&local_key, &key, 1, MPI_LONG_LONG_INT, MPI_MAX, MPI_COMM_WORLD);
-						MPI_Allreduce(&local_it_number, &it_number, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-						if(key != -1){
-							break;
-						}
-														
-						local_it_number++;
-				}
+        long long local_key;
+        int local_it_number = 0;
 
-					// Recover the current time and calculate the execution time
-					end = get_wall_time();
-					convergence_time = ((double)(end - start));
+        while(1){
+            local_key = worker_it_task(a, p, maxorder, L, rank, local_key);
+            MPI_Allreduce(&local_key, &key, 1, MPI_LONG_LONG_INT, MPI_MAX, MPI_COMM_WORLD);
+            MPI_Allreduce(&local_it_number, &it_number, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+            if(key != -1){
+              break;
+            }
+                            
+            local_it_number++;
+        }
 
-					// Choose text for describing the algorithm iteration point sets
-					char *stepdef;
-					switch (algorithm)  {
-							case VOW:   stepdef = "all-equal";                break;
-							case TOHA:  stepdef = "1/2 equal + 1/2 varying";  break;
-							case HARES: stepdef = "all-varying";              break;
-					}
+        if(rank == 0){
+          // Recover the current time and calculate the execution time
+          end = MPI_Wtime();
+          convergence_time = end - start;
+        }
 
-					// Run converged. Print information for it.
-					printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
-								 run, it_number, key, nworkers);
-					printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
-								 setup_time, convergence_time, stepdef);
 
-					// Keep track of the minimum number of iterations needed to converge in all runs.
-					if (it_number < minits) {
-							minits = it_number;
-					}
+        if(rank == 0){
+          // Choose text for describing the algorithm iteration point sets
+          char *stepdef;
+          switch (algorithm)  {
+              case VOW:   stepdef = "all-equal";                break;
+              case TOHA:  stepdef = "1/2 equal + 1/2 varying";  break;
+              case HARES: stepdef = "all-varying";              break;
+          }
 
-					if (it_number > maxits) {
-							maxits = it_number;
-					}
+          // Run converged. Print information for it.
+          printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
+                 run, it_number, key, nworkers);
+          printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
+                 setup_time, convergence_time, stepdef);
 
-					total_it_num  = total_it_num  + it_number;
-					total_it_time = total_it_time + convergence_time;
+          // Keep track of the minimum number of iterations needed to converge in all runs.
+          if (it_number < minits) {
+              minits = it_number;
+          }
 
-					// Cleanup the hash table
-					for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
+          if (it_number > maxits) {
+              maxits = it_number;
+          }
 
-					if (run == MAX_RUNS) break;
-					run++;
+          total_it_num  = total_it_num  + it_number;
+          total_it_time = total_it_time + convergence_time;
+
+        // Cleanup the hash table
+        for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
+        }
+
+
+        if (run == MAX_RUNS) break;
+        run++;
     }   // Loop to do various different executions __ while (1)
 
-     // Final statistics
-    printf("\n\nFINAL STATISTICS\n\n");
-    printf("Runs = %d, Min Its # = %d,  Max Its = %d, Av. Iteration # = %.0lf, ", run, minits, maxits, total_it_num/MAX_RUNS);
-    printf("Av. Iteration Time = %.1lf s, Total Time = %.1lf s\n\n", total_it_time/run, total_it_time);
-    //fflush(stdout);
-
-
+    if(rank == 0){
+       // Final statistics
+      printf("\n\nFINAL STATISTICS\n\n");
+      printf("Runs = %d, Min Its # = %d,  Max Its = %d, Av. Iteration # = %.0lf, ", run, minits, maxits, total_it_num/MAX_RUNS);
+      printf("Av. Iteration Time = %.1lf s, Total Time = %.1lf s\n\n", total_it_time/run, total_it_time);
+      //fflush(stdout);
+    }
 
     run_end = get_wall_time();
     run_real_end = get_cpu_time();
@@ -1066,8 +1071,8 @@ int main(int argc, char *argv[])
     printf("p: %d\n", NUM_WORKERS);
     printf("S(P): %.2lf\n", t1/tp);
     printf("E(P): %.10lf\n", (t1/tp)/((double)p));
-		printf("%d\n", id);
+    printf("%d\n", id);
     MPI_Finalize();
-	exit(0);
+    exit(0);
 }
 
