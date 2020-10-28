@@ -12,16 +12,16 @@
 
 
 // Defines that the user can control
-#define MAX_RUNS                    1
+#define MAX_RUNS                    10
 
 #ifndef NUM_WORKERS
-    #define NUM_WORKERS                4
+    #define NUM_WORKERS                2
 #endif
 
 #define NUM_THREADS                NUM_WORKERS
 
 #ifndef MODULO_NUM_BITS
-    #define MODULO_NUM_BITS            16
+    #define MODULO_NUM_BITS            20
 #endif
 
 // defined by us 
@@ -796,15 +796,18 @@ void handle_newpoint(POINT_T X, long long order, long long *key)
 //
 ////////////////////////////////////////////////////////////////////////////
 
-void
+long long
 worker_it_task(long long a, long long p, long long order,
                const int L, int id, long long *key)
 {
     // Calculate the next point
     X[id] = nextpoint(X[id], a, p, order, L, &itPsets[id]);
+		printf("x inside wit %lld %lld\n", X[id].x, X[id].y);
 
     // Handle the new point checking if the key has been found
     handle_newpoint(X[id], order, key);
+		printf("key inside wit %lld\n", key);
+		return key;
 }
 
 
@@ -956,8 +959,6 @@ int main(int argc, char *argv[])
               MPI_Send(&itPsetBase.itpoint, id, point_type, id, 42, MPI_COMM_WORLD);
             }
             setup_worker(X, a, p, maxorder, L, nbits, 0, algorithm);
-							printf("master - x - %lld %lld\n", X[0].x, X[0].y);
-							printf("slave - x - %lld %lld\n", X[1].x, X[1].y);
             for(id = 1; id < nworkers; id++){
                 MPI_Recv(&X[id], 1, point_type,  id, 42, MPI_COMM_WORLD, &status);
             }
@@ -991,17 +992,14 @@ int main(int argc, char *argv[])
                  * encontre sai da interação se não continua todas as interações
                  *  bug: faz mais de it_number interações
                  */
-                long long rkey = -1;
+					long long rkey;
 					while(1){
 
                 //for (id=0; id < nworkers; id++) {
 
-							//printf("master - x - %lld %lld\n", X[0].x, X[0].y);
-							//printf("slave - x - %lld %lld\n", X[1].x, X[1].y);
-								worker_it_task(a, p, maxorder, L, rank, &key);
-								printf("key %lld %d\n", key, rank);
-								MPI_Allreduce(&rkey, &key, 1, MPI_LONG_LONG_INT, MPI_MAX, MPI_COMM_WORLD);
-								if(key != -1){
+								key = worker_it_task(a, p, maxorder, L, rank, &key);
+								MPI_Allreduce(&key, &rkey, 1, MPI_LONG_LONG_INT, MPI_MAX, MPI_COMM_WORLD);
+								if(rkey != -1){
 									break;}
                                 
                     // key -> !NOT_KEY  key == Key_found 
@@ -1016,8 +1014,6 @@ int main(int argc, char *argv[])
                 //}
                 it_number++;
 						}
-						printf("saiu do worker it\n");
-						return 0;
 
             // Recover the current time and calculate the execution time
             end = get_wall_time();
