@@ -42,13 +42,11 @@ long long kvaluefound;
 POINT_T   hashtable[TABLESIZE];
 POINT_T   EMPTY_POINT = {0, 0, 0, 0};
 POINT_T   *Psums, *Qsums, *Tsums;
-POINT_T   X[NUM_THREADS];
-POINT_T   initX[NUM_THREADS];
 
+POINT_T   X;
+POINT_T   initX;
 IT_POINT_SET itPsetBase;
-
-IT_POINT_SET itPsets[NUM_THREADS];
-
+IT_POINT_SET itPsets;
 
 ////////////////////////////////////////////////////////////////////////////
 //
@@ -70,11 +68,6 @@ double get_wall_time(){
 double get_cpu_time(){
     return (double)clock() / CLOCKS_PER_SEC;
 }
-
-void printP(POINT_T X)  {
-    printf("(%7lld, %7lld), r = %8lld, s = %8lld", X.x, X.y, X.r, X.s);
-}
-
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -241,13 +234,6 @@ long long multiplicative_inverse(long long num, long long modulo)
     	rest = r2 % r1;
 
     	if (rest == 0) {
-
-    		if (DEBUG) {
-    		    printf("\n\n_______________________________________________________________________________\n\n\n");
-						printf("WILL BREAK:   rest = (r2 %% r1) = 0      r2=%lld    r1=%lld\n\n", r2, r1);
-    		    printf("_______________________________________________________________________________\n\n");
-    	    }
-
     	    break;
     	}
 
@@ -256,17 +242,8 @@ long long multiplicative_inverse(long long num, long long modulo)
     	x = x1 - q*x2;
     	y = y1 - q*y2;
 
-    	if (DEBUG) {
-            printf("\n\n\na[%lld]=%lld   b[%lld]=%lld   q[%lld]=%lld", i, r2, i, r1, i, q);
-		    printf("    r[%lld]=%lld    x[%lld]=%lld    y[%lld]=%lld\n\n", i, r, i, x, i, y);
-		    printf("%lld = %lld*(%lld) + %lld\n\n", r2, q, r1, r);
-		    printf("%lld = %lld*(%lld) + %lld*(%lld)\n", r, a, x, b, y);
-	    }
-
 		/* At his point  r = a*x + b*y  */
     	if (r != (a*x + b*y))  {
-    		printf("\nError: r != (a * x   +   b * y)\n\n");
-    		printf("%lld  !=  (%lld * %lld  +  %lld * %lld)      q=%lld\n", r, a, x, b, y, q);
     		break;
         }
 
@@ -287,12 +264,6 @@ long long multiplicative_inverse(long long num, long long modulo)
 		else gcd = modulo;
 	}
 	else gcd = r;
-
-	if (DEBUG) {
-	    printf("\ngcd (%lld, %lld) = %lld", num, modulo, gcd);
-	    printf("      x = %lld      y = %lld\n\n", x, y);
-	    printf("%lld = %lld*(%lld) + %lld*(%lld)\n\n", gcd, a, x, b, y);
-    }
 
 	if (gcd == 1)  {
 		if (num >= modulo)     /*  a == num,  check x */
@@ -730,15 +701,15 @@ setup_worker(POINT_T *X, long long a, long long p, long long order,
              const int L, const int nbits, int id, int alg)
 {
     // Clear the iteration point set memory
-    memset(&itPsets[id], 0, sizeof(IT_POINT_SET));
+    memset(&itPsets, 0, sizeof(IT_POINT_SET));
 
     // Calculate the iteration point set for this worker
-    calc_iteration_point_set3(&itPsets[id], &itPsetBase, Psums, Qsums, id, a, p, order, L, nbits, alg);
+    calc_iteration_point_set3(&itPsets, &itPsetBase, Psums, Qsums, id, a, p, order, L, nbits, alg);
 
     // Calculate the initial point for this worker
-    initial_point(&initX[id], Psums, Qsums, nbits, id, alg, nworkers, a, p, order);
+    initial_point(&initX, Psums, Qsums, nbits, id, alg, nworkers, a, p, order);
 
-    X[id] = initX[id];
+    *X = initX;
 
     return;
 }
@@ -768,7 +739,6 @@ void handle_newpoint(POINT_T X, long long order, long long *key)
                 num_emptyslotnotfound++;
                 if (num_emptyslotnotfound == MAX_EMPTY_SLOT_NOT_FOUND) {
                     printf("ATTENTION!!! TOO MANY FAILED STORAGE ATTEMPTS -- exiting ...\n");
-                    printf("               H = "); printP(H); printf("\n\n");
                     exit(-3);
                 }
             case UNFRUITFUL_COLLISION:
@@ -794,23 +764,16 @@ void handle_newpoint(POINT_T X, long long order, long long *key)
 // This function executes one iteration for one worker
 //
 ////////////////////////////////////////////////////////////////////////////
-
 void
 worker_it_task(long long a, long long p, long long order,
-               const int L, int id, long long *key)
+               const int L, int id, long long *key, POINT_T *X)
 {
+
     // Calculate the next point
-    X[id] = nextpoint(X[id], a, p, order, L, &itPsets[id]);
+    
+    *X = nextpoint(*X, a, p, order, L, &itPsets);
 
-    // Handle the new point checking if the key has been found
-    handle_newpoint(X[id], order, key);
 }
-
-
-
-
-
-
 
 int main(int argc, char *argv[])
 {
@@ -822,103 +785,108 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-
-    if(rank == 0){
-        long long a, b, p, maxorder, k;
-        long long key;
-        int it_number, minits, maxits = 0, run = 1;
-        //POINT_T G; 
-        POINT_T Q, P;
-        //time_t  init, term;
-        double start, end;
-        double convergence_time, setup_time;
-        //double average_it_num = 0.0, average_it_time = 0.0;
-        double total_it_num = 0.0, total_it_time = 0.0;
-        //uint32_t bitmask;
-        int i, id;
-
-        double run_start, run_end;
-        run_start = get_wall_time();
-
-        double run_real_start, run_real_end;
-        run_real_start = get_cpu_time();
-
-        switch (algorithm)  {
-            case VOW:   printf("\n\nPOLLARD RHO ALGORITHM  --  VOW\n");                  break;
-            case TOHA:  printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises and Hares\n");  break;
-            case HARES: printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises\n");            break;
-        }
-
-        /////////////////////////////////////////////////////////////////////////
-        //
-        //     ELLIPTIC CURVE EQUATION (WEIERSTRASS FORM)
-        //
-        //                 Y^2 = X^3 + aX + b
-        //
-        /////////////////////////////////////////////////////////////////////////
+    const int tag = 42;
 
 
-        printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
+    // runs master process
+    long long a, b, p, maxorder, k;
+    long long key = 0;
+    int it_number, minits, maxits = 0, run = 1;
+    //POINT_T G; 
+    POINT_T Q, P;
+    //time_t  init, term;
+    double start, end;
+    double convergence_time, setup_time;
+    //double average_it_num = 0.0, average_it_time = 0.0;
+    double total_it_num = 0.0, total_it_time = 0.0;
+    //uint32_t bitmask;
+    int i, id;
 
-       // Pick elliptic curve parameters for chosen number of bits of the prime field module p
-        switch (nbits)  {
-            case 16:
-                a = 1;   b = 44;         p = 16747;                         // 16 bits
-                maxorder = 16931;        P.x = 1; P.y = 5626;
-                k = 8047;
-                break;
-            case 20:
-                a = 1;   b = 44;         p = 1048507;                       // 20 bits
-                maxorder = 1049101;      P.x = 373173; P.y = 395411;
-                k = 3051;
-                break;
-            case 24:
-                a = 1;   b = 44;         p = 16774421;                       // 24 bits
-                maxorder = 16770883;     P.x = 4530807; P.y = 1256865;
-                k = 2349;
-                break;
-            case 28:
-                a = 1;   b = 44;         p = 268434997;                      // 28 bits
-                maxorder = 268446727;    P.x = 47793986; P.y = 101136283;
-                k = 7514;
-                break;
-           case 32:
-                a = 1;   b = 44;         p = 4294966981;                      // 32 bits
-                maxorder = 4295084473;   P.x = 3437484969; P.y = 579918983;
-                k = 2037;
-                break;
-            default:
-                printf("\n\nnbits is not in the defined set (16, 20, 24, 28, 32)\n\n");
-                exit(-1);
-        }
+    double run_start, run_end;
+    run_start = get_wall_time();
+
+    double run_real_start, run_real_end;
+    run_real_start = get_cpu_time();
+
+    switch (algorithm)  {
+        case VOW:   printf("\n\nPOLLARD RHO ALGORITHM  --  VOW\n");                  break;
+        case TOHA:  printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises and Hares\n");  break;
+        case HARES: printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises\n");            break;
+    }
+
+    /////////////////////////////////////////////////////////////////////////
+    //
+    //     ELLIPTIC CURVE EQUATION (WEIERSTRASS FORM)
+    //
+    //                 Y^2 = X^3 + aX + b
+    //
+    /////////////////////////////////////////////////////////////////////////
 
 
-        if (a == 1) printf("\nElliptic curve:   y^2 = x^3 + x + %lld      (mod %lld, %d bits)\n\n", b, p, nbits);
-        else printf("\nElliptic curve:   y^2 = x^3 + %lldx + %lld      (mod %lld, %d bits)\n\n", a, b, p, nbits);
+    printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
 
-        printf("Order of the curve = %lld\n\n", maxorder);
+   // Pick elliptic curve parameters for chosen number of bits of the prime field module p
+    switch (nbits)  {
+        case 16:
+            a = 1;   b = 44;         p = 16747;                         // 16 bits
+            maxorder = 16931;        P.x = 1; P.y = 5626;
+            k = 8047;
+            break;
+        case 20:
+            a = 1;   b = 44;         p = 1048507;                       // 20 bits
+            maxorder = 1049101;      P.x = 373173; P.y = 395411;
+            k = 3051;
+            break;
+        case 24:
+            a = 1;   b = 44;         p = 16774421;                       // 24 bits
+            maxorder = 16770883;     P.x = 4530807; P.y = 1256865;
+            k = 2349;
+            break;
+        case 28:
+            a = 1;   b = 44;         p = 268434997;                      // 28 bits
+            maxorder = 268446727;    P.x = 47793986; P.y = 101136283;
+            k = 7514;
+            break;
+       case 32:
+            a = 1;   b = 44;         p = 4294966981;                      // 32 bits
+            maxorder = 4295084473;   P.x = 3437484969; P.y = 579918983;
+            k = 2037;
+            break;
+        default:
+            printf("\n\nnbits is not in the defined set (16, 20, 24, 28, 32)\n\n");
+            exit(-1);
+    }
 
-        printf("Number of workers = %d\n\n", nworkers);
 
-        // Calculating point Q = kP
-        printf("Calculating point Q = kP      (k = %lld)\n", k);
-        calc_P_sums(P, a, p, maxorder, nbits);
-        calc_Q(&Q, Psums, k, nbits, a, p);
-        calc_Q_sums(Q, a, p, maxorder, nbits);
+    if (a == 1) printf("\nElliptic curve:   y^2 = x^3 + x + %lld      (mod %lld, %d bits)\n\n", b, p, nbits);
+    else printf("\nElliptic curve:   y^2 = x^3 + %lldx + %lld      (mod %lld, %d bits)\n\n", a, b, p, nbits);
 
-        printf("\n");
-        printf("          P = (%8lld, %8lld)          (Base Point)\n", P.x, P.y);
-        printf("          Q = (%8lld, %8lld)          (Q = kP    )\n\n\n", Q.x, Q.y);
+    printf("Order of the curve = %lld\n\n", maxorder);
 
-        // Initialize minits
-        minits = maxorder;
+    printf("Number of workers = %d\n\n", nworkers);
 
-        // Loop to calculate the desired secret key (k) MAX_RUNS times, each one
-        // with randomly chosen step and starting points for each thread (worker).
-        // Remember the number of iterations each run took to find the key (k).
-        // Then calculate the expected (average) number of iterations that this
-        // calculation takes.
+    // Calculating point Q = kP
+    printf("Calculating point Q = kP      (k = %lld)\n", k);
+    calc_P_sums(P, a, p, maxorder, nbits);
+    calc_Q(&Q, Psums, k, nbits, a, p);
+    calc_Q_sums(Q, a, p, maxorder, nbits);
 
+    printf("\n");
+    printf("          P = (%8lld, %8lld)          (Base Point)\n", P.x, P.y);
+    printf("          Q = (%8lld, %8lld)          (Q = kP    )\n\n\n", Q.x, Q.y);
+
+    // Initialize minits
+    minits = maxorder;
+
+    // Loop to calculate the desired secret key (k) MAX_RUNS times, each one
+    // with randomly chosen step and starting points for each thread (worker).
+    // Remember the number of iterations each run took to find the key (k).
+    // Then calculate the expected (average) number of iterations that this
+    // calculation takes.
+   
+    MPI_Request request; 
+    MPI_Status status;
+    if(rank !=0){
         while (1) {
             
             // Initialize the number of iterations
@@ -934,13 +902,12 @@ int main(int argc, char *argv[])
             rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
 
             // Set up the running environment for the search for all workers
-            printf("Run[%3d] setup:    ", run);
+            //printf("Run[%3d] setup:    ", run);
 
-            for (id=0; id < nworkers; id++) {
-                setup_worker(X, a, p, maxorder, L, nbits, id, algorithm);
-                //fflush(stdout);
-            }
-            printf("\nRun[%3d] iterations: ", run);
+            //for (id=0; id < nworkers; id++) {
+            setup_worker(&X, a, p, maxorder, L, nbits, id, algorithm);
+            //}
+            //printf("\nRun[%3d] iterations: ", run);
 
             // Stop counting the setup time and calculate it
             end = get_wall_time();
@@ -949,29 +916,27 @@ int main(int argc, char *argv[])
 
             // Start counting the execution time
             start = get_wall_time();
-                    
             for ( ; ; ) {
 
-                /*
-                 * Usar a função worker_it_task it_number vezes, caso
-                 * encontre sai da interação se não continua todas as interações
-                 *  bug: faz mais de it_number interações
-                 */
                 long long rkey = -1;
-                for (id=0; id < nworkers; id++) {
-                    worker_it_task(a, p, maxorder, L, id, &key);
-                                
-                    // key -> !NOT_KEY  key == Key_found 
-                    if (key != NO_KEY_FOUND){
-                        rkey = key;
-                    }
+                worker_it_task(a, p, maxorder, L, id, &key, &X);
+                // Handle the new point checking if the key has been found
+               
+                if(X.x%256 == 5 || 1){
+                    handle_newpoint(X, maxorder, &key);
+                    printf("Sending %lld to rank 0\n", key);
+                    MPI_Isend(&key, 1, MPI_LONG_LONG, 0, 42, MPI_COMM_WORLD, &request);
+                }
+               
+                // key -> !NOT_KEY  key == Key_found 
+                if (key != NO_KEY_FOUND){
+                    rkey = key;
                 }
                 //fflush(stdout);
 
                 //if (abs(reductedKey) != abs(NO_KEY_FOUND)) {
                 if (rkey != NO_KEY_FOUND) {
                     key = rkey;
-                    printf("  (%d its)\n", it_number);
                     break;
                 }
                 it_number++;
@@ -990,11 +955,13 @@ int main(int argc, char *argv[])
             }
 
             // Run converged. Print information for it.
+            /*
             printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
                    run, it_number, key, nworkers);
             printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
                    setup_time, convergence_time, stepdef);
 
+            */
             // Keep track of the minimum number of iterations needed to converge in all runs.
             if (it_number < minits) {
                 minits = it_number;
@@ -1010,17 +977,31 @@ int main(int argc, char *argv[])
             // Cleanup the hash table
             for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
 
-            if (run == MAX_RUNS) break;
+            if (run == MAX_RUNS){
+                printf("Processo %d terminou\n", rank);
+                key = -1;
+                MPI_Isend(&key, 1, MPI_LONG_LONG, 0, 42, MPI_COMM_WORLD, &request);
+                break;
+
+            }
             run++;
-        }   // Loop to do various different executions __ while (1)
+        }
+    }else{
+        //master rank
+
+        while(1){
+            MPI_Irecv(&key, 1, MPI_LONG_LONG, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &request);
+            MPI_Wait(&request, &status);
+
+            printf("============%lld\n", key);
+
+
+        }
 
          // Final statistics
         printf("\n\nFINAL STATISTICS\n\n");
         printf("Runs = %d, Min Its # = %d,  Max Its = %d, Av. Iteration # = %.0lf, ", run, minits, maxits, total_it_num/MAX_RUNS);
         printf("Av. Iteration Time = %.1lf s, Total Time = %.1lf s\n\n", total_it_time/run, total_it_time);
-        //fflush(stdout);
-
-
 
         run_end = get_wall_time();
         run_real_end = get_cpu_time();
