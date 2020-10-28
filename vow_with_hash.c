@@ -731,7 +731,6 @@ setup_worker(POINT_T *X, long long a, long long p, long long order,
 {
     // Clear the iteration point set memory
     memset(&itPsets[id], 0, sizeof(IT_POINT_SET));
-		printf("XXXX %lld %lld\n", X[0].x, X[1].x);
 
     // Calculate the iteration point set for this worker
     calc_iteration_point_set3(&itPsets[id], &itPsetBase, Psums, Qsums, id, a, p, order, L, nbits, alg);
