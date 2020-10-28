@@ -798,15 +798,13 @@ void handle_newpoint(POINT_T X, long long order, long long *key)
 
 long long
 worker_it_task(long long a, long long p, long long order,
-               const int L, int id, long long *key)
+               const int L, int id, long long key)
 {
     // Calculate the next point
     X[id] = nextpoint(X[id], a, p, order, L, &itPsets[id]);
-		printf("x inside wit %lld %lld\n", X[id].x, X[id].y);
 
     // Handle the new point checking if the key has been found
-    handle_newpoint(X[id], order, key);
-		printf("key inside wit %lld\n", key);
+    handle_newpoint(X[id], order, &key);
 		return key;
 }
 
@@ -840,6 +838,14 @@ int main(int argc, char *argv[])
 
     MPI_Type_create_struct(nitems, blocklengths, offsets, types, &point_type);
     MPI_Type_commit(&point_type);
+
+
+		MPI_Datatype point_set_type;
+    int lengths[1] = { NUM_IT_FUNCTION_INTERVALS };
+    const MPI_Aint displacements[1] = { 0 };
+    MPI_Datatype it_types[1] = { point_type };
+    MPI_Type_create_struct(1, lengths, displacements, it_types, &point_set_type);
+    MPI_Type_commit(&point_set_type);
 
     long long a, b, p, maxorder, k;
     long long key;
@@ -956,7 +962,7 @@ int main(int argc, char *argv[])
 						rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
             for(int id = 1; id < nworkers; id++){
 							MPI_Send(&id, 1, MPI_INT, id, 42, MPI_COMM_WORLD);
-              MPI_Send(&itPsetBase.itpoint, id, point_type, id, 42, MPI_COMM_WORLD);
+              MPI_Send(&itPsetBase, id, point_set_type, id, 42, MPI_COMM_WORLD);
             }
             setup_worker(X, a, p, maxorder, L, nbits, 0, algorithm);
             for(id = 1; id < nworkers; id++){
@@ -965,7 +971,7 @@ int main(int argc, char *argv[])
         } else {
             int id_slv;
             MPI_Recv(&id_slv, 1, MPI_INT,  0, 42, MPI_COMM_WORLD, &status);
-            MPI_Recv(&itPsetBase.itpoint, id_slv, point_type,  0, 42, MPI_COMM_WORLD, &status);
+            MPI_Recv(&itPsetBase, id_slv, point_set_type,  0, 42, MPI_COMM_WORLD, &status);
             setup_worker(X, a, p, maxorder, L, nbits, 1, algorithm);
             MPI_Send(&X[id_slv], 1, point_type, 0, 42, MPI_COMM_WORLD);
 
@@ -992,73 +998,54 @@ int main(int argc, char *argv[])
                  * encontre sai da interação se não continua todas as interações
                  *  bug: faz mais de it_number interações
                  */
-					long long rkey;
-					while(1){
-
-                //for (id=0; id < nworkers; id++) {
-
-								key = worker_it_task(a, p, maxorder, L, rank, &key);
-								MPI_Allreduce(&key, &rkey, 1, MPI_LONG_LONG_INT, MPI_MAX, MPI_COMM_WORLD);
-								if(rkey != -1){
-									break;}
-                                
-                    // key -> !NOT_KEY  key == Key_found 
-                //}
-                //fflush(stdout);
-
-                //if (abs(reductedKey) != abs(NO_KEY_FOUND)) {
-                //if (rkey != NO_KEY_FOUND) {
-                //    key = rkey;
-                //    printf("  (%d its)\n", it_number);
-                //    break;
-                //}
-                it_number++;
+				long long local_key;
+				int local_it_number;
+				while(1){
+						local_key = worker_it_task(a, p, maxorder, L, rank, local_key);
+						MPI_Allreduce(&local_key, &key, 1, MPI_LONG_LONG_INT, MPI_MAX, MPI_COMM_WORLD);
+						MPI_Allreduce(&local_it_number, &it_number, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+						if(key != -1){
+							break;
 						}
+														
+						local_it_number++;
+				}
 
-            // Recover the current time and calculate the execution time
-            end = get_wall_time();
-            convergence_time = ((double)(end - start));
+					// Recover the current time and calculate the execution time
+					end = get_wall_time();
+					convergence_time = ((double)(end - start));
 
-            // Choose text for describing the algorithm iteration point sets
-            char *stepdef;
-            switch (algorithm)  {
-                case VOW:   stepdef = "all-equal";                break;
-                case TOHA:  stepdef = "1/2 equal + 1/2 varying";  break;
-                case HARES: stepdef = "all-varying";              break;
-            }
+					// Choose text for describing the algorithm iteration point sets
+					char *stepdef;
+					switch (algorithm)  {
+							case VOW:   stepdef = "all-equal";                break;
+							case TOHA:  stepdef = "1/2 equal + 1/2 varying";  break;
+							case HARES: stepdef = "all-varying";              break;
+					}
 
-            // Run converged. Print information for it.
-            printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
-                   run, it_number, key, nworkers);
-            printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
-                   setup_time, convergence_time, stepdef);
+					// Run converged. Print information for it.
+					printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
+								 run, it_number, key, nworkers);
+					printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
+								 setup_time, convergence_time, stepdef);
 
-            // Keep track of the minimum number of iterations needed to converge in all runs.
-            if (it_number < minits) {
-                minits = it_number;
-            }
+					// Keep track of the minimum number of iterations needed to converge in all runs.
+					if (it_number < minits) {
+							minits = it_number;
+					}
 
-            if (it_number > maxits) {
-                maxits = it_number;
-            }
+					if (it_number > maxits) {
+							maxits = it_number;
+					}
 
-            total_it_num  = total_it_num  + it_number;
-            total_it_time = total_it_time + convergence_time;
+					total_it_num  = total_it_num  + it_number;
+					total_it_time = total_it_time + convergence_time;
 
-            // Cleanup the hash table
-            for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
+					// Cleanup the hash table
+					for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
 
-            if (run == MAX_RUNS) break;
-            run++;
-        //}  // End if rank == 0
-				//else{
-					//printf("ooooi\n");
-					//MPI_Finalize();
-					//return 0;
-			//}
-			if(rank != 0){
-				printf("ola\n");
-			}
+					if (run == MAX_RUNS) break;
+					run++;
     }   // Loop to do various different executions __ while (1)
 
      // Final statistics
