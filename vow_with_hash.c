@@ -12,10 +12,10 @@
 
 
 // Defines that the user can control
-#define MAX_RUNS                    50
+#define MAX_RUNS                    1
 
 #ifndef NUM_WORKERS
-    #define NUM_WORKERS                2
+    #define NUM_WORKERS                4
 #endif
 
 #define NUM_THREADS                NUM_WORKERS
@@ -30,7 +30,7 @@
 // GLOBAL VARIABLES
 
 // CONSTANT VALUED VARIABLES
-const int algorithm = HARES;
+const int algorithm = VOW;
 const int L = NUM_IT_FUNCTION_INTERVALS;
 const int nbits = MODULO_NUM_BITS;
 const int nworkers = NUM_WORKERS;
@@ -731,6 +731,7 @@ setup_worker(POINT_T *X, long long a, long long p, long long order,
 {
     // Clear the iteration point set memory
     memset(&itPsets[id], 0, sizeof(IT_POINT_SET));
+		printf("XXXX %lld %lld\n", X[0].x, X[1].x);
 
     // Calculate the iteration point set for this worker
     calc_iteration_point_set3(&itPsets[id], &itPsetBase, Psums, Qsums, id, a, p, order, L, nbits, alg);
@@ -823,10 +824,19 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    MPI_Datatype dt_point;
-    MPI_Type_contiguous(4, MPI_LONG_LONG, &dt_point);
-    MPI_Type_commit(&dt_point);
+    const int nitems=4;
+    int          blocklengths[4] = {1,1,1,1};
+    MPI_Datatype types[4] = {MPI_LONG_LONG_INT, MPI_LONG_LONG_INT, MPI_LONG_LONG_INT, MPI_LONG_LONG_INT};
+    MPI_Datatype point_type;
+    MPI_Aint     offsets[4];
 
+    offsets[0] = offsetof(POINT_T, x);
+    offsets[1] = offsetof(POINT_T, y);
+    offsets[2] = offsetof(POINT_T, r);
+    offsets[3] = offsetof(POINT_T, s);
+
+    MPI_Type_create_struct(nitems, blocklengths, offsets, types, &point_type);
+    MPI_Type_commit(&point_type);
 
     long long a, b, p, maxorder, k;
     long long key;
@@ -935,69 +945,79 @@ int main(int argc, char *argv[])
         start = get_wall_time();
 
         // Calculate the iteration point set base (randomly)
-        rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
 
         // Set up the running environment for the search for all workers
         printf("Run[%3d] setup:    ", run);
 
         if(rank == 0){
-            int id;
-            for(id = 1; id < nworkers; id++){
-                MPI_Send(&id, 1, MPI_INT, id, 42, MPI_COMM_WORLD);
+						rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
+            for(int id = 1; id < nworkers; id++){
+							MPI_Send(&id, 1, MPI_INT, id, 42, MPI_COMM_WORLD);
+              MPI_Send(&itPsetBase.itpoint, id, point_type, id, 42, MPI_COMM_WORLD);
             }
             setup_worker(X, a, p, maxorder, L, nbits, 0, algorithm);
+							printf("master - x - %lld %lld\n", X[0].x, X[0].y);
+							printf("slave - x - %lld %lld\n", X[1].x, X[1].y);
             for(id = 1; id < nworkers; id++){
-                MPI_Recv(&X[id], 1, dt_point,  id, 42, MPI_COMM_WORLD, &status);
+                MPI_Recv(&X[id], 1, point_type,  id, 42, MPI_COMM_WORLD, &status);
             }
         } else {
             int id_slv;
             MPI_Recv(&id_slv, 1, MPI_INT,  0, 42, MPI_COMM_WORLD, &status);
-            setup_worker(X, a, p, maxorder, L, nbits, id_slv, algorithm);
-            MPI_Send(&X[id_slv], 1, dt_point, 0, 42, MPI_COMM_WORLD);
-        }
+            MPI_Recv(&itPsetBase.itpoint, id_slv, point_type,  0, 42, MPI_COMM_WORLD, &status);
+            setup_worker(X, a, p, maxorder, L, nbits, 1, algorithm);
+            MPI_Send(&X[id_slv], 1, point_type, 0, 42, MPI_COMM_WORLD);
 
-        printf("ASDF_2\n");
+            //MPI_Send(&X[id_slv], 1, point_type, 0, 42, MPI_COMM_WORLD);
+       	} 
+				//return 0;
+
         //for (id=0; id < nworkers; id++) {
         //    setup_worker(X, a, p, maxorder, L, nbits, id, algorithm);
         //    //fflush(stdout);
         //}
-        if(rank == 0){
-            printf("\nRun[%3d] iterations: ", run);
+        //if(rank == 0){
+						
+				// Stop counting the setup time and calculate it
+				end = get_wall_time();
 
-            // Stop counting the setup time and calculate it
-            end = get_wall_time();
+				setup_time = ((double)(end - start));
 
-            setup_time = ((double)(end - start));
-
-            // Start counting the execution time
-            start = get_wall_time();
+				// Start counting the execution time
+				start = get_wall_time();
                     
-            for ( ; ; ) {
-
                 /*
                  * Usar a função worker_it_task it_number vezes, caso
                  * encontre sai da interação se não continua todas as interações
                  *  bug: faz mais de it_number interações
                  */
                 long long rkey = -1;
-                for (id=0; id < nworkers; id++) {
-                    worker_it_task(a, p, maxorder, L, id, &key);
+					while(1){
+
+                //for (id=0; id < nworkers; id++) {
+
+							//printf("master - x - %lld %lld\n", X[0].x, X[0].y);
+							//printf("slave - x - %lld %lld\n", X[1].x, X[1].y);
+								worker_it_task(a, p, maxorder, L, rank, &key);
+								printf("key %lld %d\n", key, rank);
+								MPI_Allreduce(&rkey, &key, 1, MPI_LONG_LONG_INT, MPI_MAX, MPI_COMM_WORLD);
+								if(key != -1){
+									break;}
                                 
                     // key -> !NOT_KEY  key == Key_found 
-                    if (key != NO_KEY_FOUND){
-                        rkey = key;
-                    }
-                }
+                //}
                 //fflush(stdout);
 
                 //if (abs(reductedKey) != abs(NO_KEY_FOUND)) {
-                if (rkey != NO_KEY_FOUND) {
-                    key = rkey;
-                    printf("  (%d its)\n", it_number);
-                    break;
-                }
+                //if (rkey != NO_KEY_FOUND) {
+                //    key = rkey;
+                //    printf("  (%d its)\n", it_number);
+                //    break;
+                //}
                 it_number++;
-            }
+						}
+						printf("saiu do worker it\n");
+						return 0;
 
             // Recover the current time and calculate the execution time
             end = get_wall_time();
@@ -1034,7 +1054,15 @@ int main(int argc, char *argv[])
 
             if (run == MAX_RUNS) break;
             run++;
-        }  // End if rank == 0
+        //}  // End if rank == 0
+				//else{
+					//printf("ooooi\n");
+					//MPI_Finalize();
+					//return 0;
+			//}
+			if(rank != 0){
+				printf("ola\n");
+			}
     }   // Loop to do various different executions __ while (1)
 
      // Final statistics
@@ -1056,7 +1084,7 @@ int main(int argc, char *argv[])
     printf("p: %d\n", NUM_WORKERS);
     printf("S(P): %.2lf\n", t1/tp);
     printf("E(P): %.10lf\n", (t1/tp)/((double)p));
-
+		printf("%d\n", id);
     MPI_Finalize();
 	exit(0);
 }
