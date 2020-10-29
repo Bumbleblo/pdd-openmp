@@ -835,6 +835,7 @@ int main(int argc, char *argv[])
     double run_real_start, run_real_end;
     run_real_start = get_cpu_time();
 
+    if(rank==0)
     switch (algorithm)  {
         case VOW:   printf("\n\nPOLLARD RHO ALGORITHM  --  VOW\n");                  break;
         case TOHA:  printf("\n\nPOLLARD RHO ALGORITHM  --  Tortoises and Hares\n");  break;
@@ -850,7 +851,7 @@ int main(int argc, char *argv[])
     /////////////////////////////////////////////////////////////////////////
 
 
-    printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
+    //printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
 
     // Pick elliptic curve parameters for chosen number of bits of the prime field module p
     switch (nbits)  {
@@ -885,22 +886,26 @@ int main(int argc, char *argv[])
     }
 
 
+    /*
     if (a == 1) printf("\nElliptic curve:   y^2 = x^3 + x + %lld      (mod %lld, %d bits)\n\n", b, p, nbits);
     else printf("\nElliptic curve:   y^2 = x^3 + %lldx + %lld      (mod %lld, %d bits)\n\n", a, b, p, nbits);
+    */
 
-    printf("Order of the curve = %lld\n\n", maxorder);
+    //printf("Order of the curve = %lld\n\n", maxorder);
 
-    printf("Number of workers = %d\n\n", nworkers);
+    //printf("Number of workers = %d\n\n", nworkers);
 
     // Calculating point Q = kP
-    printf("Calculating point Q = kP      (k = %lld)\n", k);
+    //printf("Calculating point Q = kP      (k = %lld)\n", k);
     calc_P_sums(P, a, p, maxorder, nbits);
     calc_Q(&Q, Psums, k, nbits, a, p);
     calc_Q_sums(Q, a, p, maxorder, nbits);
 
+    /*
     printf("\n");
     printf("          P = (%8lld, %8lld)          (Base Point)\n", P.x, P.y);
     printf("          Q = (%8lld, %8lld)          (Q = kP    )\n\n\n", Q.x, Q.y);
+    */
 
     // Initialize minits
     minits = maxorder;
