@@ -830,10 +830,12 @@ int main(int argc, char *argv[])
     MPI_Datatype point_type;
     MPI_Aint     offsets[4];
 
-    offsets[0] = offsetof(POINT_T, x);
-    offsets[1] = offsetof(POINT_T, y);
-    offsets[2] = offsetof(POINT_T, r);
-    offsets[3] = offsetof(POINT_T, s);
+    POINT_T data;
+
+    offsets[0] = ((void*)&data.x) - ((void*)&data);
+    offsets[1] = ((void*)&data.y) - ((void*)&data);
+    offsets[2] = ((void*)&data.r) - ((void*)&data);
+    offsets[3] = ((void*)&data.s) - ((void*)&data);
 
     MPI_Type_create_struct(nitems, blocklengths, offsets, types, &point_type);
     MPI_Type_commit(&point_type);
