@@ -5,22 +5,18 @@ bits=16
 all: compile run clean
 
 CC=mpicc
-PROF=gprof
+RUN=mpirun
+HOSTS=cm2,cm3,cm4
+
+#mpicc -D MODULO_NUM_BITS=16 -D NUM_WORKERS=2 vow_with_hash.c -I. -o prog.out && time mpirun --map-by ppr:1:node --hosts cm3,cm4 ./prog.out > out 
+
 
 compile: 
 	
-	@$(CC) -o prog.out -I. -D NUM_WORKERS=$(workers) -D MODULO_NUM_BITS=$(bits) -fopenmp vow_with_hash.c
-
-compile-profile:
-	
-	@$(CC) -o prog.out -pg -I. -D NUM_WORKERS=$(workers) -D MODULO_NUM_BITS=$(bits) -fopenmp vow_with_hash.c
-
-view-profile:
-	@
-	$(PROF) prog.out gmon.out
+	@$(CC) -o prog.out -I. -D NUM_WORKERS=$(workers) -D MODULO_NUM_BITS=$(bits) vow_with_hash.c
 
 run:
-	@mpirun ./prog.out 
+	@mpirun --map-by ppr:$(workers):node --hosts=$(HOSTS) ./prog.out 
 
 clean:
 	@rm prog.out

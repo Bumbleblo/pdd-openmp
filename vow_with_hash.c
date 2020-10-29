@@ -823,6 +823,7 @@ int main(int argc, char *argv[])
     MPI_Status status;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    printf("Group size %d\n", size);
 
     const int nitems=4;
     int          blocklengths[4] = {1,1,1,1};
@@ -862,7 +863,7 @@ int main(int argc, char *argv[])
     int i, id;
 
     double run_start, run_end;
-    run_start = get_wall_time();
+    run_start = MPI_Wtime();
 
     double run_real_start, run_real_end;
     run_real_start = get_cpu_time();
@@ -1068,13 +1069,12 @@ int main(int argc, char *argv[])
       //fflush(stdout);
     }
 
-    run_end = get_wall_time();
+    run_end = MPI_Wtime();
     run_real_end = get_cpu_time();
 
     double tp = ((double) run_end - run_start);
     double t1 = ((double) run_real_end - run_real_start);
 
-    printf("T(1): %.2lf\n", t1);
     printf("T(p): %.2lf\n", tp);
     printf("p: %d\n", NUM_WORKERS);
     printf("S(P): %.2lf\n", t1/tp);
