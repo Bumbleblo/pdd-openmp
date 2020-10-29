@@ -30,7 +30,7 @@
 // GLOBAL VARIABLES
 
 // CONSTANT VALUED VARIABLES
-const int algorithm = HARES;
+const int algorithm = VOW;
 const int L = NUM_IT_FUNCTION_INTERVALS;
 const int nbits = MODULO_NUM_BITS;
 const int nworkers = NUM_WORKERS;
@@ -766,14 +766,39 @@ void handle_newpoint(POINT_T X, long long order, long long *key)
 ////////////////////////////////////////////////////////////////////////////
 void
 worker_it_task(long long a, long long p, long long order,
-               const int L, int id, long long *key, POINT_T *X)
+        const int L, int id, long long *key, POINT_T *X)
 {
 
     // Calculate the next point
-    
+
     *X = nextpoint(*X, a, p, order, L, &itPsets);
 
 }
+
+void mpi_init(MPI_Datatype *type){
+
+    int blocklen[] = {1, 1, 1, 1};
+
+    POINT_T type_struct;
+    MPI_Aint disp[4];
+    disp[0] = ((void*)&type_struct.x) - ((void*)&type_struct);
+    disp[1] = ((void*)&type_struct.y) - ((void*)&type_struct);
+    disp[2] = ((void*)&type_struct.r) - ((void*)&type_struct);
+    disp[3] = ((void*)&type_struct.s) - ((void*)&type_struct);
+
+    MPI_Datatype types[] = {
+        MPI_LONG_LONG,
+        MPI_LONG_LONG, 
+        MPI_LONG_LONG,
+        MPI_LONG_LONG
+    };
+
+    MPI_Type_create_struct(4, blocklen, disp, types, type);
+    MPI_Type_commit(type);
+
+}
+
+
 
 int main(int argc, char *argv[])
 {
@@ -787,6 +812,8 @@ int main(int argc, char *argv[])
 
     const int tag = 42;
 
+    MPI_Datatype message_type;
+    mpi_init(&message_type);
 
     // runs master process
     long long a, b, p, maxorder, k;
@@ -825,7 +852,7 @@ int main(int argc, char *argv[])
 
     printf("\nNumber of bits of the EC prime field (16/20/24/28/32): %d\n\n", nbits);
 
-   // Pick elliptic curve parameters for chosen number of bits of the prime field module p
+    // Pick elliptic curve parameters for chosen number of bits of the prime field module p
     switch (nbits)  {
         case 16:
             a = 1;   b = 44;         p = 16747;                         // 16 bits
@@ -847,7 +874,7 @@ int main(int argc, char *argv[])
             maxorder = 268446727;    P.x = 47793986; P.y = 101136283;
             k = 7514;
             break;
-       case 32:
+        case 32:
             a = 1;   b = 44;         p = 4294966981;                      // 32 bits
             maxorder = 4295084473;   P.x = 3437484969; P.y = 579918983;
             k = 2037;
@@ -883,69 +910,47 @@ int main(int argc, char *argv[])
     // Remember the number of iterations each run took to find the key (k).
     // Then calculate the expected (average) number of iterations that this
     // calculation takes.
-   
+
     MPI_Request request; 
     MPI_Status status;
+    int stop_flag;
+
+    int running = 0;
     if(rank !=0){
         while (1) {
-            
-            // Initialize the number of iterations
+
             it_number = 1;
+            if(!running){
+                MPI_Recv(&stop_flag, 1, MPI_INT, rank-1, tag, MPI_COMM_WORLD, &status);
+                running=1;
+            }
+            if(rank!=size-1){
+                MPI_Send(&stop_flag, 1, MPI_INT, rank+1, tag, MPI_COMM_WORLD);
+            }
 
-            // Initialize the random generator
-            srand(time(NULL));
-
-            // Start counting the setup time
-            start = get_wall_time();
-
-            // Calculate the iteration point set base (randomly)
             rand_itpset(&itPsetBase, Psums, Qsums, id, a, p, maxorder, L, nbits, algorithm);
-
-            // Set up the running environment for the search for all workers
-            //printf("Run[%3d] setup:    ", run);
-
-            //for (id=0; id < nworkers; id++) {
             setup_worker(&X, a, p, maxorder, L, nbits, id, algorithm);
-            //}
-            //printf("\nRun[%3d] iterations: ", run);
-
-            // Stop counting the setup time and calculate it
-            end = get_wall_time();
-
-            setup_time = ((double)(end - start));
 
             // Start counting the execution time
-            start = get_wall_time();
-            for ( ; ; ) {
+
+            int flag = 0;
+            for (int i = 0 ; i < MAX_RUNS; ++i) {
 
                 long long rkey = -1;
                 worker_it_task(a, p, maxorder, L, id, &key, &X);
                 // Handle the new point checking if the key has been found
-               
-                if(X.x%256 == 5 || 1){
-                    handle_newpoint(X, maxorder, &key);
-                    printf("Sending %lld to rank 0\n", key);
-                    MPI_Isend(&key, 1, MPI_LONG_LONG, 0, 42, MPI_COMM_WORLD, &request);
-                }
-               
-                // key -> !NOT_KEY  key == Key_found 
-                if (key != NO_KEY_FOUND){
-                    rkey = key;
-                }
-                //fflush(stdout);
 
-                //if (abs(reductedKey) != abs(NO_KEY_FOUND)) {
-                if (rkey != NO_KEY_FOUND) {
-                    key = rkey;
-                    break;
-                }
+                int r = MPI_Send(&X, 1, message_type, 0, tag, MPI_COMM_WORLD);
+
                 it_number++;
+
+                //MPI_Irecv(&flag, 1, MPI_INT, 0, tag, MPI_COMM_WORLD, &request);
+
             }
 
             // Recover the current time and calculate the execution time
             end = get_wall_time();
             convergence_time = ((double)(end - start));
-
             // Choose text for describing the algorithm iteration point sets
             char *stepdef;
             switch (algorithm)  {
@@ -956,12 +961,12 @@ int main(int argc, char *argv[])
 
             // Run converged. Print information for it.
             /*
-            printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
-                   run, it_number, key, nworkers);
-            printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
-                   setup_time, convergence_time, stepdef);
+               printf("\nRun[%3d] converged after %4d iterations: k = %lld, nworkers = %4d,\n",
+               run, it_number, key, nworkers);
+               printf("         setup time = %6.1lf s, conv time = %6.1lf s (itfs \"%s\")\n\n",
+               setup_time, convergence_time, stepdef);
 
-            */
+*/
             // Keep track of the minimum number of iterations needed to converge in all runs.
             if (it_number < minits) {
                 minits = it_number;
@@ -976,11 +981,8 @@ int main(int argc, char *argv[])
 
             // Cleanup the hash table
             for (i=0; i < TABLESIZE; i++) hashtable[i] = EMPTY_POINT;
-
             if (run == MAX_RUNS){
                 printf("Processo %d terminou\n", rank);
-                key = -1;
-                MPI_Isend(&key, 1, MPI_LONG_LONG, 0, 42, MPI_COMM_WORLD, &request);
                 break;
 
             }
@@ -989,13 +991,22 @@ int main(int argc, char *argv[])
     }else{
         //master rank
 
+        int stop_message = 1;
+        MPI_Send(&stop_flag, 1, MPI_INT, 1, tag , MPI_COMM_WORLD);
+
+        printf("Master rank\n");
         while(1){
-            MPI_Irecv(&key, 1, MPI_LONG_LONG, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &request);
-            MPI_Wait(&request, &status);
+            MPI_Recv(&X, 1, message_type, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-            printf("============%lld\n", key);
+            //printf("%lld %lld %lld %lld\n", X.x, X.y, X.r, X.s);
 
+            handle_newpoint(X, maxorder, &key);
 
+            if(key != NO_KEY_FOUND){
+                printf("------->key %lld\n", key);
+
+                break;
+            }
         }
 
          // Final statistics
